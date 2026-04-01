@@ -3,18 +3,21 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cla-proxy-python"
-description = "Add your description here"
+name = "cla-proxy"
+description = "A proxy that translates OpenAI Chat Completions API to Responses API for RHEL Lightspeed"
 readme = "README.md"
 dependencies = [
     # tomli is only required below 3.11 as it is native after that version.
     'tomli; python_version<"3.11"',
+    # Exists in EPEL9/EPEL10
     "httpx>=0.28.1",
+    # Both exists in EPEL9/EPEL10
     "pydantic>=2.12.4",
-    "fastapi[standard-no-fastapi-cloud-cli]>=0.121.2",
     "pydantic-settings>=2.11.0",
+    # Exists in EPEL9/EPEL10
+    "fastapi[standard-no-fastapi-cloud-cli]>=0.121.2",
 ]
-requires-python = ">=3.9,<4.0" # RHEL 9 and 10
+requires-python = ">=3.14,<4.0"
 license-files = ["LICENSE"]
 dynamic = ["version"]
 
@@ -23,7 +26,18 @@ dynamic = ["version"]
 "Bug Tracker" = "https://github.com/rhel-lightspeed/cla-proxy/issues"
 
 [project.scripts]
-cla-proxy = "cla_proxy.cli:serve"
+cla-proxy = "cla_proxy.app:serve"
 
-[tool.setuptools]
-packages = ["cla_proxy"]
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.8",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.25",
+    "ty>=0.0.27",
+]

@@ -4,9 +4,9 @@
 endpoint = "http://localhost:8000"
 # HTTP request timeout in seconds (increase for CPU inference)
 timeout = 30
-# Define https proxy to route the request through it.
-# proxies = { http = "http://localhost:8002", https = "https://localhost:8002" }
-# The proxy also accepts `username:password@localhost:8002` as it's input
+# Define a proxy to route requests through.
+# The proxy also accepts `username:password@localhost:8002` as its input
+#proxy = "http://proxy:1234"
 
 # Configure authentication settings for backend
 [backend.auth]
@@ -18,7 +18,7 @@ key_file = "data/development/auth/key.pem"
 # Logging configuration settings
 [logging]
 # The default logging level for all messages logged by CLAD.
-level = "INFO"
+level = "DEBUG"
 
 [server]
 reload = true

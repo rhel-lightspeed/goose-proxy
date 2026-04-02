@@ -1,7 +1,7 @@
 GOOSE_TELEMETRY_ENABLED: false
 OPENAI_HOST: http://127.0.0.1:8080
 OPENAI_BASE_PATH: v1/responses
-GOOSE_PROVIDER: custom_cla-proxy
+GOOSE_PROVIDER: custom_goose-proxy
 GOOSE_MODEL: rhel-lightspeed/goose
 extensions:
   todo:

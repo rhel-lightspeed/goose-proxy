@@ -46,7 +46,7 @@ repos:
     hooks:
       - id: check-rebase
         args:
-          - https://github.com/rhel-lightspeed/cla-proxy.git
+          - https://github.com/rhel-lightspeed/goose-proxy.git
         stages: [manual, pre-push]
 
   - repo: https://github.com/pre-commit/mirrors-mypy

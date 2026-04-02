@@ -12,7 +12,7 @@ reviews:
   sequence_diagrams: true
 
   path_instructions:
-    - path: "cla_proxy/**"
+    - path: "src/goose_proxy/**"
       instructions: |
         This is a FastAPI proxy that translates OpenAI Chat Completions API
         requests to a backend LLM inference service (lightspeed-stack) with
@@ -24,12 +24,12 @@ reviews:
         - Timeout handling — the proxy has request timeout middleware; ensure
           new code respects it and doesn't introduce unguarded blocking calls.
         - Configuration via pydantic-settings and TOML; no hardcoded values.
-        - Error responses must follow the CLA-compatible format defined in
+        - Error responses must follow the OpenAI-compatible format defined in
           error_handlers.py.
         - RHEL compatibility: Python 3.9+ (no walrus operators in complex
           expressions, no match/case, etc.).
 
-    - path: "cla_proxy/routes/**"
+    - path: "src/goose_proxy/routers/**"
       instructions: |
         API route handlers. Ensure:
         - Request/response models are defined in models.py, not inline.

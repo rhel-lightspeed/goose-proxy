@@ -5,7 +5,7 @@ import time
 from collections.abc import AsyncIterator
 from typing import Any
 
-from cla_proxy.models.responses import (
+from goose_proxy.models.responses import (
     ResponseCompletedEvent,
     ResponseCreatedEvent,
     ResponseFunctionCallArgumentsDeltaEvent,

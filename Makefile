@@ -7,7 +7,7 @@ help: ## Show this help message
 
 .PHONY: dev
 dev: ## Run development API
-	uv run fastapi dev src/cla_proxy/app.py
+	uv run fastapi dev src/goose_proxy/app.py
 
 .PHONY: test
 test: ## Run tests

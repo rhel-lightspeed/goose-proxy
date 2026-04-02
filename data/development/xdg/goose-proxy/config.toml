@@ -17,7 +17,7 @@ key_file = "data/development/auth/key.pem"
 
 # Logging configuration settings
 [logging]
-# The default logging level for all messages logged by CLAD.
+# The default logging level for all messages logged by goose-proxy.
 level = "DEBUG"
 
 [server]

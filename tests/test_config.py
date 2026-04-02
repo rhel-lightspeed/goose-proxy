@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cla_proxy.config import Logging, Auth, Backend, Server, get_xdg_config_path
+from goose_proxy.config import Logging, Auth, Backend, Server, get_xdg_config_path
 
 
 class TestLogging:

@@ -1,6 +1,6 @@
 # API Translation Reference
 
-cla-proxy translates between the OpenAI Chat Completions API (consumed by Goose) and the Responses API (exposed by lightspeed-stack). This document details every translation performed by the proxy.
+goose-proxy translates between the OpenAI Chat Completions API (consumed by Goose) and the Responses API (exposed by lightspeed-stack). This document details every translation performed by the proxy.
 
 ## Request Translation
 

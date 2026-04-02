@@ -1,6 +1,6 @@
 """Tests for Pydantic model validation and helpers."""
 
-from cla_proxy.models.responses import (
+from goose_proxy.models.responses import (
     Response,
     parse_stream_event,
 )

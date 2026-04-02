@@ -1,3 +1,3 @@
-# CLA Proxy
+# Goose Proxy
 
-A small python api to proxy requests for CLA.
+A small python api to proxy requests for Goose.

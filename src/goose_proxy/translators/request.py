@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from cla_proxy.models.chat import (
+from goose_proxy.models.chat import (
     ChatCompletionRequest,
     ChatMessage,
     ContentPart,

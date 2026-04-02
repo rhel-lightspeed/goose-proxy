@@ -7,9 +7,9 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from cla_proxy.app import app
-from cla_proxy.config import Backend, Settings
-from cla_proxy.models.responses import (
+from goose_proxy.app import app
+from goose_proxy.config import Backend, Settings
+from goose_proxy.models.responses import (
     Response,
     ResponseCompletedEvent,
     ResponseCreatedEvent,
@@ -84,7 +84,7 @@ def test_client():
     original_client = getattr(app.state, "http_client", None)
     app.state.http_client = MagicMock()
 
-    with patch("cla_proxy.middleware.get_settings", return_value=mock_settings):
+    with patch("goose_proxy.middleware.get_settings", return_value=mock_settings):
         yield TestClient(app, raise_server_exceptions=False)
 
     app.state.http_client = original_client
@@ -106,7 +106,7 @@ def tool_call_response_fixture():
 class TestChatCompletions:
     def test_chat_completions_success(self, test_client, text_response_fixture):
         with patch(
-            "cla_proxy.routers.v1.create_response",
+            "goose_proxy.routers.v1.create_response",
             new_callable=AsyncMock,
             return_value=text_response_fixture,
         ):
@@ -125,7 +125,7 @@ class TestChatCompletions:
 
     def test_chat_completions_with_tools(self, test_client, tool_call_response_fixture):
         with patch(
-            "cla_proxy.routers.v1.create_response",
+            "goose_proxy.routers.v1.create_response",
             new_callable=AsyncMock,
             return_value=tool_call_response_fixture,
         ):
@@ -203,7 +203,7 @@ class TestChatCompletions:
             for e in events:
                 yield e
 
-        with patch("cla_proxy.routers.v1.stream_response", side_effect=mock_stream):
+        with patch("goose_proxy.routers.v1.stream_response", side_effect=mock_stream):
             resp = test_client.post(
                 "/v1/chat/completions",
                 json={
@@ -231,7 +231,7 @@ class TestChatCompletions:
         error_response._request = httpx.Request("POST", "http://test")
 
         with patch(
-            "cla_proxy.routers.v1.create_response",
+            "goose_proxy.routers.v1.create_response",
             new_callable=AsyncMock,
             side_effect=httpx.HTTPStatusError(
                 message="Not Found",

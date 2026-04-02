@@ -8,7 +8,7 @@ from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse, StreamingResponse
 from starlette.routing import Route
 
-from cla_proxy.middleware import TimeoutMiddleware
+from goose_proxy.middleware import TimeoutMiddleware
 
 
 def _make_app(handler, timeout: int | float = 5):
@@ -28,7 +28,7 @@ class TestTimeoutMiddleware:
             return PlainTextResponse("OK")
 
         wrapped, mock_settings = _make_app(handler, timeout=5)
-        with patch("cla_proxy.middleware.get_settings", return_value=mock_settings):
+        with patch("goose_proxy.middleware.get_settings", return_value=mock_settings):
             client = TestClient(wrapped)
             resp = client.get("/")
         assert resp.status_code == 200
@@ -40,7 +40,7 @@ class TestTimeoutMiddleware:
             return PlainTextResponse("Too late")
 
         wrapped, mock_settings = _make_app(handler, timeout=0.1)
-        with patch("cla_proxy.middleware.get_settings", return_value=mock_settings):
+        with patch("goose_proxy.middleware.get_settings", return_value=mock_settings):
             client = TestClient(wrapped)
             resp = client.get("/")
         assert resp.status_code == 504
@@ -73,7 +73,7 @@ class TestTimeoutMiddleware:
             return StreamingResponse(generate(), media_type="text/plain")
 
         wrapped, mock_settings = _make_app(handler, timeout=0.1)
-        with patch("cla_proxy.middleware.get_settings", return_value=mock_settings):
+        with patch("goose_proxy.middleware.get_settings", return_value=mock_settings):
             client = TestClient(wrapped)
             resp = client.get("/")
         # The response should complete successfully since headers were sent quickly
@@ -86,7 +86,7 @@ class TestTimeoutMiddleware:
             raise ValueError("Something went wrong")
 
         wrapped, mock_settings = _make_app(handler, timeout=5)
-        with patch("cla_proxy.middleware.get_settings", return_value=mock_settings):
+        with patch("goose_proxy.middleware.get_settings", return_value=mock_settings):
             client = TestClient(wrapped, raise_server_exceptions=False)
             resp = client.get("/")
         assert resp.status_code == 500

@@ -3,7 +3,7 @@ import asyncio
 from starlette.types import ASGIApp, Receive, Scope, Send
 from fastapi.responses import JSONResponse
 
-from cla_proxy.config import get_settings
+from goose_proxy.config import get_settings
 
 
 class TimeoutMiddleware:

@@ -1,6 +1,6 @@
 """Translate Responses API responses to Chat Completions format."""
 
-from cla_proxy.models.chat import (
+from goose_proxy.models.chat import (
     ChatCompletion,
     ChatCompletionMessageToolCall,
     ChatCompletionResponseMessage,
@@ -8,7 +8,7 @@ from cla_proxy.models.chat import (
     CompletionUsage,
     Function,
 )
-from cla_proxy.models.responses import (
+from goose_proxy.models.responses import (
     OutputItem,
     Response,
     ResponseFunctionToolCall,

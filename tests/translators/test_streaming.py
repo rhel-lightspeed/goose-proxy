@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from cla_proxy.models.responses import (
+from goose_proxy.models.responses import (
     Response,
     ResponseCompletedEvent,
     ResponseCreatedEvent,
@@ -15,7 +15,7 @@ from cla_proxy.models.responses import (
     ResponseTextDeltaEvent,
     ResponseUsage,
 )
-from cla_proxy.translators.streaming import translate_stream
+from goose_proxy.translators.streaming import translate_stream
 
 
 def _make_base_response(

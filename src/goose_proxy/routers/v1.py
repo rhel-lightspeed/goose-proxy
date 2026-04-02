@@ -6,9 +6,9 @@ import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
-from cla_proxy.models.chat import ChatCompletionRequest, ModelInfo, ModelsResponse
-from cla_proxy.models.responses import Response, StreamEvent, parse_stream_event
-from cla_proxy.translators import (
+from goose_proxy.models.chat import ChatCompletionRequest, ModelInfo, ModelsResponse
+from goose_proxy.models.responses import Response, StreamEvent, parse_stream_event
+from goose_proxy.translators import (
     translate_request,
     translate_response,
     translate_stream,

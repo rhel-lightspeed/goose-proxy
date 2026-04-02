@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cla-proxy"
+name = "goose-proxy"
 description = "A proxy that translates OpenAI Chat Completions API to Responses API for RHEL Lightspeed"
 readme = "README.md"
 dependencies = [
@@ -22,11 +22,11 @@ license-files = ["LICENSE"]
 dynamic = ["version"]
 
 [project.urls]
-"Source code" = "https://github.com/rhel-lightspeed/cla-proxy"
-"Bug Tracker" = "https://github.com/rhel-lightspeed/cla-proxy/issues"
+"Source code" = "https://github.com/rhel-lightspeed/goose-proxy"
+"Bug Tracker" = "https://github.com/rhel-lightspeed/goose-proxy/issues"
 
 [project.scripts]
-cla-proxy = "cla_proxy.app:serve"
+goose-proxy = "goose_proxy.app:serve"
 
 [tool.setuptools.packages.find]
 where = ["src"]

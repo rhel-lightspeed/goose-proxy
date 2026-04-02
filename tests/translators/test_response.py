@@ -2,14 +2,14 @@
 
 import pytest
 
-from cla_proxy.models.responses import (
+from goose_proxy.models.responses import (
     Response,
     ResponseFunctionToolCall,
     ResponseOutputMessage,
     ResponseOutputText,
     ResponseUsage,
 )
-from cla_proxy.translators.response import translate_response
+from goose_proxy.translators.response import translate_response
 
 
 def _make_usage(input_tokens=10, output_tokens=5, total_tokens=15):

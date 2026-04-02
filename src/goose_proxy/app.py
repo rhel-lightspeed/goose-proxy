@@ -5,10 +5,10 @@ import uvicorn
 import httpx
 from fastapi import FastAPI
 
-from cla_proxy.config import get_settings
-from cla_proxy.exceptions import register_exception_handlers
-from cla_proxy.middleware import TimeoutMiddleware
-from cla_proxy.routers import v1
+from goose_proxy.config import get_settings
+from goose_proxy.exceptions import register_exception_handlers
+from goose_proxy.middleware import TimeoutMiddleware
+from goose_proxy.routers import v1
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="cla-proxy",
+    title="goose-proxy",
     description="A proxy that translates OpenAI Chat Completions API to Responses API",
     version="0.1.0",
     contact={"name": "RHEL Lightspeed Team", "email": "rhel-lightspeed-sst@redhat.com"},
@@ -64,7 +64,7 @@ def serve():
     """Entry point for running the application with uvicorn."""
     settings = get_settings()
     uvicorn.run(
-        "cla_proxy.app:app" if settings.server.reload else app,
+        "goose_proxy.app:app" if settings.server.reload else app,
         host=settings.server.host,
         port=settings.server.port,
         reload=settings.server.reload,

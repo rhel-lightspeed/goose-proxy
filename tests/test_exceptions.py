@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import httpx
 from fastapi import HTTPException
 
-from cla_proxy.exceptions import (
+from goose_proxy.exceptions import (
     _http_exception_handler,
     _http_status_error_handler,
     _httpx_error_handler,

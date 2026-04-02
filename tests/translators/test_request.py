@@ -2,7 +2,7 @@
 
 import pytest
 
-from cla_proxy.models.chat import (
+from goose_proxy.models.chat import (
     ChatCompletionMessageToolCall,
     ChatCompletionRequest,
     ChatMessage,
@@ -10,7 +10,7 @@ from cla_proxy.models.chat import (
     Tool,
     ToolFunction,
 )
-from cla_proxy.translators.request import translate_request
+from goose_proxy.translators.request import translate_request
 
 
 @pytest.fixture

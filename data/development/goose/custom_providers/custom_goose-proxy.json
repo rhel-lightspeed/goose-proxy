@@ -1,8 +1,8 @@
 {
-  "name": "custom_cla-proxy",
+  "name": "custom_goose-proxy",
   "engine": "openai",
-  "display_name": "cla-proxy",
-  "description": "Custom cla-proxy provider",
+  "display_name": "goose-proxy",
+  "description": "Custom goose-proxy provider",
   "api_key_env": "",
   "base_url": "http://127.0.0.1:8080",
   "base_path": "v1/responses",

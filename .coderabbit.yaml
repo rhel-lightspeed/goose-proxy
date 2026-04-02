@@ -12,7 +12,7 @@ reviews:
   sequence_diagrams: true
 
   path_instructions:
-    - path: "goose_proxy/**"
+    - path: "src/goose_proxy/**"
       instructions: |
         This is a FastAPI proxy that translates OpenAI Chat Completions API
         requests to a backend LLM inference service (lightspeed-stack) with
@@ -29,7 +29,7 @@ reviews:
         - RHEL compatibility: Python 3.9+ (no walrus operators in complex
           expressions, no match/case, etc.).
 
-    - path: "goose_proxy/routes/**"
+    - path: "src/goose_proxy/routers/**"
       instructions: |
         API route handlers. Ensure:
         - Request/response models are defined in models.py, not inline.

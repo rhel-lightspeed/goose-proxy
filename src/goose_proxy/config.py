@@ -27,7 +27,7 @@ def get_xdg_config_path() -> Path:
 
     In case it is not present, this function will return the default path that
     is `/etc/xdg`, which is where we want to locate our configuration file for
-    Command Line Assistant.
+    goose-proxy.
 
     $XDG_CONFIG_DIRS defines the preference-ordered set of base directories to
     search for configuration files in addition to the $XDG_CONFIG_HOME base
@@ -94,7 +94,7 @@ class Logging(BaseModel):
 
 
 class Auth(BaseModel):
-    """Internal schema that represents the authentication for clad.
+    """Internal schema that represents the authentication for goose-proxy.
 
     Attributes:
         cert_file (Path): The path to the RHSM certificate file

@@ -22,7 +22,7 @@ A `403 Forbidden` response means the RHSM certificate lacks the required entitle
 Start the proxy first:
 
 ```bash
-uv run cla-proxy
+uv run goose-proxy
 ```
 
 ### Non-Streaming Request

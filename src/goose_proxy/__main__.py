@@ -1,4 +1,4 @@
-from goose_proxy.app import serve
+from goose_proxy.cli import serve
 
 
 if __name__ == "__main__":

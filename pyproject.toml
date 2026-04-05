@@ -25,7 +25,7 @@ dynamic = ["version"]
 "Bug Tracker" = "https://github.com/rhel-lightspeed/goose-proxy/issues"
 
 [project.scripts]
-goose-proxy = "goose_proxy.app:serve"
+goose-proxy = "goose_proxy.cli:serve"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,0 +1,68 @@
+[Unit]
+Description=Goose Proxy Daemon Service
+Documentation=man:goose-proxy(8)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+RemainAfterExit=no
+ExecStart=/usr/bin/goose-proxy
+
+# Run as an ephemeral unprivileged user
+DynamicUser=true
+
+# Filesystem: deny everything, then allowlist read-only paths
+ProtectHome=true
+ProtectSystem=strict
+TemporaryFileSystem=/:ro
+BindReadOnlyPaths=/var/lib/goose-proxy
+BindReadOnlyPaths=/etc/pki/consumer
+InaccessibleDirectories=/home
+
+# Private /tmp so the service can't snoop on other processes
+PrivateTmp=true
+
+# Device access: only /dev/null, /dev/urandom, /dev/random
+PrivateDevices=true
+DeviceAllow=/dev/null rw
+DeviceAllow=/dev/urandom r
+DeviceAllow=/dev/random r
+
+# Kernel and system protection
+ProtectControlGroups=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectClock=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectHostname=true
+
+# Network: localhost-only IPv4
+RestrictAddressFamilies=AF_INET
+IPAddressAllow=localhost
+IPAddressDeny=any
+
+# Namespace and privilege restrictions
+RestrictNamespaces=true
+CapabilityBoundingSet=
+NoNewPrivileges=true
+PrivateUsers=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+
+# System call filtering: only native arch, only basic service calls
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Memory protection
+MemoryDenyWriteExecute=true
+
+# Resource limits
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

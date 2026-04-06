@@ -52,7 +52,43 @@ test = [
 ]
 
 [tool.pytest.ini_options]
+addopts = [
+    "-r", "a",
+    "--verbose",
+    "--strict-markers",
+    "--cov", "src",
+    "--cov", "tests",
+    "--cov-report", "html",
+    "--cov-report", "term-missing:skip-covered",
+    "--durations-min", "1",
+    "--durations", "10",
+    "--color", "yes",
+    "--showlocals",
+    "--pdbcls", "IPython.terminal.debugger:TerminalPdb",
+]
 asyncio_mode = "auto"
+pythonpath = "src"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+data_file = "coverage/.data"
+source = [
+    "src",
+    "tests",
+]
+omit = [
+    ".venv/*"  # VS Code is including these files in reports for an unknown reason
+]
+
+[tool.coverage.html]
+directory = "coverage/htmlcov"
+
+[tool.coverage.json]
+output = "coverage/coverage.json"
+
+[tool.coverage.xml]
+output = "coverage/coverage.xml"
 
 [tool.ruff]
 line-length = 120

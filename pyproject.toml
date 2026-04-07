@@ -16,7 +16,7 @@ dependencies = [
     # Exists in EPEL9/EPEL10
     "fastapi[standard-no-fastapi-cloud-cli]>=0.121.2",
 ]
-requires-python = ">=3.9,<4.0"  # RHEL 9 and 10
+requires-python = ">=3.9"  # RHEL 9 and 10
 license-files = ["LICENSE"]
 dynamic = ["version"]
 
@@ -97,6 +97,7 @@ output = "coverage/coverage.xml"
 [tool.ruff]
 line-length = 120
 indent-width = 4
+target-version = "py39"
 
 [tool.ruff.lint]
 # https://docs.astral.sh/ruff/rules/
@@ -120,3 +121,6 @@ force-single-line = true
 lines-after-imports = 2
 lines-between-types = 1
 order-by-type = false
+
+[tool.ty.environment]
+python-version = "3.9"

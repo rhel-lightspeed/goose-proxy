@@ -2,6 +2,7 @@
 
 import logging
 import os
+import sys
 
 from functools import lru_cache
 from pathlib import Path
@@ -9,10 +10,12 @@ from pathlib import Path
 from pydantic import BaseModel
 from pydantic import Field
 from pydantic import field_validator
-from pydantic_settings import BaseSettings
-from pydantic_settings import PydanticBaseSettingsSource
-from pydantic_settings import SettingsConfigDict
-from pydantic_settings import TomlConfigSettingsSource
+
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 
 #: Define the config file path.
@@ -126,23 +129,10 @@ class Server(BaseModel):
     workers: int = 1
 
 
-class Settings(BaseSettings):
+class Settings(BaseModel):
     backend: Backend = Field(default_factory=Backend)
     logging: Logging = Field(default_factory=Logging)
     server: Server = Field(default_factory=Server)
-
-    model_config = SettingsConfigDict(toml_file=Path(get_xdg_config_path(), *CONFIG_FILE_DEFINITION))
-
-    @classmethod
-    def settings_customise_sources(
-        cls,
-        settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
-    ) -> tuple[PydanticBaseSettingsSource, ...]:
-        return (TomlConfigSettingsSource(settings_cls),)
 
 
 @lru_cache(maxsize=1)
@@ -152,4 +142,13 @@ def get_settings() -> Settings:
     This avoids re-parsing the TOML config file every time settings are needed
     and makes the configuration available before the ASGI lifespan runs.
     """
-    return Settings()
+    config_path = Path(get_xdg_config_path(), *CONFIG_FILE_DEFINITION)
+
+    if config_path.exists():
+        with open(config_path, "rb") as f:
+            data = tomllib.load(f)
+    else:
+        logger.warning("Config file not found at %s, using defaults.", config_path)
+        data = {}
+
+    return Settings(**data)

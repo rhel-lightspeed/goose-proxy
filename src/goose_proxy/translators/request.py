@@ -1,6 +1,10 @@
 """Translate Chat Completions requests to Responses API parameters."""
 
 from typing import Any
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Union
 
 from goose_proxy.models.chat import ChatCompletionRequest
 from goose_proxy.models.chat import ChatMessage
@@ -10,8 +14,8 @@ from goose_proxy.models.chat import TextContentPart
 
 
 def _translate_tool_choice(
-    tool_choice: str | dict[str, Any],
-) -> str | dict[str, Any]:
+    tool_choice: Union[str, dict[str, Any]],
+) -> Union[str, dict[str, Any]]:
     """Translate tool_choice from Chat Completions to Responses API format.
 
     String values ("auto", "required", "none") pass through.
@@ -54,8 +58,8 @@ def _translate_tools(
 
 
 def _translate_user_content(
-    content: str | list[ContentPart] | None,
-) -> list[dict[str, Any]]:
+    content: Union[str, List[ContentPart], None],
+) -> List[dict[str, Any]]:
     """Convert user message content to Responses API content parts.
 
     Handles both plain string content and array content (text + image_url blocks).
@@ -74,7 +78,7 @@ def _translate_user_content(
 
 def _translate_messages(  # noqa: C901
     messages: list[ChatMessage],
-) -> tuple[str | None, list[dict[str, Any]]]:
+) -> Tuple[Optional[str], List[dict[str, Any]]]:
     """Convert Chat Completions messages to Responses API input items.
 
     Returns (instructions, input_items) where instructions is the concatenated

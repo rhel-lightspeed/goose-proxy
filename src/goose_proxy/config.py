@@ -15,7 +15,7 @@ from pydantic import field_validator
 if sys.version_info >= (3, 11):
     import tomllib
 else:
-    import tomli as tomllib
+    import tomli as tomllib  # ty: ignore[unresolved-import]
 
 
 #: Define the config file path.

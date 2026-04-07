@@ -5,6 +5,8 @@ import time
 
 from collections.abc import AsyncIterator
 from typing import Any
+from typing import Dict
+from typing import Optional
 
 from goose_proxy.models.responses import ResponseCompletedEvent
 from goose_proxy.models.responses import ResponseCreatedEvent
@@ -21,8 +23,8 @@ def _make_chunk(
     model: str,
     created: int,
     delta: dict[str, Any],
-    finish_reason: str | None = None,
-    usage: dict[str, Any] | None = None,
+    finish_reason: Optional[str] = None,
+    usage: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Build a single SSE line for a Chat Completions chunk."""
     chunk = {
@@ -81,7 +83,7 @@ def _determine_finish_reason(event: ResponseCompletedEvent, has_tool_calls: bool
     return reason
 
 
-def _translate_usage(event: ResponseCompletedEvent) -> dict[str, int] | None:
+def _translate_usage(event: ResponseCompletedEvent) -> Optional[Dict[str, int]]:
     """Extract usage from a completed event into Chat Completions format."""
     if event.response.usage is None:
         return None
@@ -94,7 +96,7 @@ def _translate_usage(event: ResponseCompletedEvent) -> dict[str, int] | None:
 
 async def translate_stream(
     stream: AsyncIterator[StreamEvent],
-    model: str | None,
+    model: Optional[str],
 ) -> AsyncIterator[str]:
     """Translate Responses API stream events into Chat Completions SSE lines.
 

@@ -81,7 +81,7 @@ def _determine_finish_reason(event: ResponseCompletedEvent, has_tool_calls: bool
     return reason
 
 
-def _translate_usage(event: ResponseCompletedEvent) -> t.Optional[t.Dict[str, int]]:
+def _translate_usage(event: ResponseCompletedEvent) -> t.Optional[dict[str, int]]:
     """Extract usage from a completed event into Chat Completions format."""
     if event.response.usage is None:
         return None

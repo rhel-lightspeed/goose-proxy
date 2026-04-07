@@ -74,7 +74,7 @@ def _translate_user_content(
 
 def _translate_messages(  # noqa: C901
     messages: list[ChatMessage],
-) -> t.Tuple[t.Optional[str], t.List[dict[str, t.Any]]]:
+) -> tuple[t.Optional[str], t.List[dict[str, t.Any]]]:
     """Convert Chat Completions messages to Responses API input items.
 
     Returns (instructions, input_items) where instructions is the concatenated

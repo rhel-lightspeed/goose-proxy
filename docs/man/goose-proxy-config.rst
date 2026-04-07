@@ -54,7 +54,7 @@ Settings for communicating with the upstream Responses API server.
 
 ``endpoint`` = *string*
     The base URL of the backend API server.
-    **Default:** ``"https://0.0.0.0:7080"``
+    **Default:** ``"https://cert.console.redhat.com/api/lightspeed/v1"``
 
 ``timeout`` = *integer*
     HTTP request timeout in seconds. This timeout covers only the initial

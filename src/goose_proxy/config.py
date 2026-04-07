@@ -130,7 +130,7 @@ class Backend(BaseModel):
         timeout (int): HTTP request timeout in seconds
     """
 
-    endpoint: str = "https://0.0.0.0:7080"
+    endpoint: str = "https://cert.console.redhat.com/api/lightspeed/v1"
     auth: Auth = Field(default_factory=Auth)
     proxy: str = ""
     timeout: int = 30

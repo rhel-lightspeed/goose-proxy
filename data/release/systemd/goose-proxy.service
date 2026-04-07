@@ -15,7 +15,6 @@ DynamicUser=true
 # Filesystem: read-only except /dev, /proc, /sys
 ProtectHome=true
 ProtectSystem=strict
-ReadOnlyPaths=/var/lib/goose-proxy
 
 # Load RHSM certificates via systemd credentials so the DynamicUser can
 # access files that are owned by root in /etc/pki/consumer.

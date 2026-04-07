@@ -9,16 +9,16 @@ readme = "README.md"
 dependencies = [
     # tomli is only required below 3.11 as it is native after that version.
     'tomli; python_version<"3.11"',
-    # Exists in EPEL9/EPEL10
     "httpx>=0.28.1",
-    # Both exists in EPEL9/EPEL10
     "pydantic>=2.12.4",
-    # Exists in EPEL9/EPEL10
     "fastapi[standard-no-fastapi-cloud-cli]>=0.121.2",
+    "uvicorn>=0.38.0",
 ]
-requires-python = ">=3.9"  # RHEL 9 and 10
+# Python 3.9 is the minimum version available in RHEL.
+requires-python = ">=3.9"
 license-files = ["LICENSE"]
 dynamic = ["version"]
+classifiers = ["Programming Language :: Python :: 3"]
 
 [project.urls]
 "Source code" = "https://github.com/rhel-lightspeed/goose-proxy"

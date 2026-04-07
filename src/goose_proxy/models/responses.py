@@ -3,11 +3,7 @@
 from __future__ import annotations
 
 import logging
-
-from typing import Annotated
-from typing import cast
-from typing import Literal
-from typing import Union
+import typing as t
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -22,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class ResponseOutputText(BaseModel):
-    type: Literal["output_text"] = "output_text"
+    type: t.Literal["output_text"] = "output_text"
     text: str
     annotations: list = Field(default_factory=list)
 
@@ -30,7 +26,7 @@ class ResponseOutputText(BaseModel):
 
 
 class ResponseOutputMessage(BaseModel):
-    type: Literal["message"] = "message"
+    type: t.Literal["message"] = "message"
     id: str
     content: list[ResponseOutputText]
     role: str
@@ -40,7 +36,7 @@ class ResponseOutputMessage(BaseModel):
 
 
 class ResponseFunctionToolCall(BaseModel):
-    type: Literal["function_call"] = "function_call"
+    type: t.Literal["function_call"] = "function_call"
     id: str
     call_id: str
     name: str
@@ -50,8 +46,8 @@ class ResponseFunctionToolCall(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
-OutputItem = Annotated[
-    Union[ResponseOutputMessage, ResponseFunctionToolCall],
+OutputItem = t.Annotated[
+    t.Union[ResponseOutputMessage, ResponseFunctionToolCall],
     Field(discriminator="type"),
 ]
 
@@ -73,7 +69,7 @@ class Response(BaseModel):
     object: str
     output: list[OutputItem]
     status: str
-    usage: ResponseUsage | None = None
+    usage: t.Optional[ResponseUsage] = None
 
     model_config = ConfigDict(extra="ignore")
 
@@ -100,13 +96,13 @@ class Response(BaseModel):
 
 
 class ResponseCreatedEvent(BaseModel):
-    type: Literal["response.created"] = "response.created"
+    type: t.Literal["response.created"] = "response.created"
     response: Response
     sequence_number: int
 
 
 class ResponseTextDeltaEvent(BaseModel):
-    type: Literal["response.output_text.delta"] = "response.output_text.delta"
+    type: t.Literal["response.output_text.delta"] = "response.output_text.delta"
     delta: str
     content_index: int
     item_id: str
@@ -117,14 +113,14 @@ class ResponseTextDeltaEvent(BaseModel):
 
 
 class ResponseOutputItemAddedEvent(BaseModel):
-    type: Literal["response.output_item.added"] = "response.output_item.added"
+    type: t.Literal["response.output_item.added"] = "response.output_item.added"
     item: OutputItem
     output_index: int
     sequence_number: int
 
 
 class ResponseFunctionCallArgumentsDeltaEvent(BaseModel):
-    type: Literal["response.function_call_arguments.delta"] = "response.function_call_arguments.delta"
+    type: t.Literal["response.function_call_arguments.delta"] = "response.function_call_arguments.delta"
     delta: str
     item_id: str
     output_index: int
@@ -132,12 +128,12 @@ class ResponseFunctionCallArgumentsDeltaEvent(BaseModel):
 
 
 class ResponseCompletedEvent(BaseModel):
-    type: Literal["response.completed"] = "response.completed"
+    type: t.Literal["response.completed"] = "response.completed"
     response: Response
     sequence_number: int
 
 
-StreamEvent = Union[
+StreamEvent = t.Union[
     ResponseCreatedEvent,
     ResponseTextDeltaEvent,
     ResponseOutputItemAddedEvent,
@@ -154,7 +150,7 @@ _EVENT_TYPES: dict[str, type[BaseModel]] = {
 }
 
 
-def parse_stream_event(data: dict) -> StreamEvent | None:
+def parse_stream_event(data: dict) -> t.Optional[StreamEvent]:
     """Parse a raw event dict into a typed streaming event model.
 
     Returns None for unknown event types or events containing
@@ -171,4 +167,4 @@ def parse_stream_event(data: dict) -> StreamEvent | None:
             logger.debug("Skipping output_item.added for unknown type: %s", item_type)
             return None
 
-    return cast(StreamEvent, event_cls.model_validate(data))
+    return t.cast(StreamEvent, event_cls.model_validate(data))

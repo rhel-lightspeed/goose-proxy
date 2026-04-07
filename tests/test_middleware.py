@@ -1,6 +1,7 @@
 """Tests for the timeout middleware."""
 
 import asyncio
+import typing as t
 
 from unittest.mock import MagicMock
 from unittest.mock import patch
@@ -14,7 +15,7 @@ from starlette.testclient import TestClient
 from goose_proxy.middleware import TimeoutMiddleware
 
 
-def _make_app(handler, timeout: int | float = 5):
+def _make_app(handler, timeout: t.Union[int, float] = 5):
     """Create a minimal Starlette app with TimeoutMiddleware."""
     app = Starlette(routes=[Route("/", handler)])
     mock_settings = MagicMock()

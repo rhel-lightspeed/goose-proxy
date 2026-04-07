@@ -1,56 +1,36 @@
-"""Tests for exception handlers."""
+import json
 
 from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import httpx
 
-from fastapi import HTTPException
-
-from goose_proxy.exceptions import _http_exception_handler
 from goose_proxy.exceptions import _http_status_error_handler
 from goose_proxy.exceptions import _httpx_error_handler
+from goose_proxy.exceptions import _openai_error_response
 
 
-def _dummy_request():
-    return MagicMock()
+def _parse(resp):
+    return json.loads(resp.get_data(as_text=True))
 
 
-class TestHttpExceptionHandler:
-    def test_4xx_returns_invalid_request_error(self):
-        exc = HTTPException(status_code=400, detail="Bad request body")
-        resp = _http_exception_handler(_dummy_request(), exc)
+class TestOpenaiErrorResponse:
+    def test_4xx_builds_correct_response(self):
+        resp = _openai_error_response(400, "Bad request body", "invalid_request_error")
+
         assert resp.status_code == 400
-        assert resp.body is not None
         body = _parse(resp)
         assert body["error"]["type"] == "invalid_request_error"
         assert body["error"]["message"] == "Bad request body"
         assert body["error"]["code"] == 400
 
-    def test_404_returns_invalid_request_error(self):
-        exc = HTTPException(status_code=404, detail="Not found")
-        resp = _http_exception_handler(_dummy_request(), exc)
-        body = _parse(resp)
-        assert body["error"]["type"] == "invalid_request_error"
+    def test_500_builds_server_error(self):
+        resp = _openai_error_response(500, "Internal error", "server_error")
 
-    def test_499_returns_invalid_request_error(self):
-        exc = HTTPException(status_code=499, detail="Client closed")
-        resp = _http_exception_handler(_dummy_request(), exc)
-        body = _parse(resp)
-        assert body["error"]["type"] == "invalid_request_error"
-
-    def test_500_returns_server_error(self):
-        exc = HTTPException(status_code=500, detail="Internal error")
-        resp = _http_exception_handler(_dummy_request(), exc)
         body = _parse(resp)
         assert resp.status_code == 500
         assert body["error"]["type"] == "server_error"
         assert body["error"]["message"] == "Internal error"
-
-    def test_502_returns_server_error(self):
-        exc = HTTPException(status_code=502, detail="Bad gateway")
-        resp = _http_exception_handler(_dummy_request(), exc)
-        body = _parse(resp)
-        assert body["error"]["type"] == "server_error"
 
 
 class TestHttpStatusErrorHandler:
@@ -65,7 +45,9 @@ class TestHttpStatusErrorHandler:
             request=response._request,
             response=response,
         )
-        resp = _http_status_error_handler(_dummy_request(), exc)
+
+        resp = _http_status_error_handler(exc)
+
         body = _parse(resp)
         assert resp.status_code == 422
         assert body["error"]["message"] == "Invalid parameters"
@@ -82,7 +64,9 @@ class TestHttpStatusErrorHandler:
             request=response._request,
             response=response,
         )
-        resp = _http_status_error_handler(_dummy_request(), exc)
+
+        resp = _http_status_error_handler(exc)
+
         body = _parse(resp)
         assert resp.status_code == 500
         assert body["error"]["message"] == "Internal Server Error"
@@ -98,10 +82,11 @@ class TestHttpStatusErrorHandler:
             request=response._request,
             response=response,
         )
-        resp = _http_status_error_handler(_dummy_request(), exc)
+
+        resp = _http_status_error_handler(exc)
+
         body = _parse(resp)
         assert resp.status_code == 503
-        # Falls back to str(exc) since error.message is missing
         assert "Unavailable" in body["error"]["message"]
 
     def test_preserves_status_code(self):
@@ -115,14 +100,18 @@ class TestHttpStatusErrorHandler:
             request=response._request,
             response=response,
         )
-        resp = _http_status_error_handler(_dummy_request(), exc)
+
+        resp = _http_status_error_handler(exc)
+
         assert resp.status_code == 429
 
 
 class TestHttpxErrorHandler:
     def test_generic_httpx_error_returns_502(self):
         exc = httpx.ConnectError("Connection refused")
-        resp = _httpx_error_handler(_dummy_request(), exc)
+
+        resp = _httpx_error_handler(exc)
+
         body = _parse(resp)
         assert resp.status_code == 502
         assert body["error"]["type"] == "api_error"
@@ -130,13 +119,35 @@ class TestHttpxErrorHandler:
 
     def test_timeout_error_returns_502(self):
         exc = httpx.ReadTimeout("Read timed out")
-        resp = _httpx_error_handler(_dummy_request(), exc)
+
+        resp = _httpx_error_handler(exc)
+
         body = _parse(resp)
         assert resp.status_code == 502
         assert "Read timed out" in body["error"]["message"]
 
 
-def _parse(resp):
-    import json
+class TestIntegration:
+    def test_error_handler_registered_on_app(self):
+        from goose_proxy.app import create_app
 
-    return json.loads(resp.body)
+        app = create_app()
+        app.config["TESTING"] = True
+        app.config["http_client"] = MagicMock(spec=httpx.Client)
+
+        with app.test_client() as client:
+            with patch(
+                "goose_proxy.routers.v1.create_response",
+                side_effect=httpx.ConnectError("Connection refused"),
+            ):
+                resp = client.post(
+                    "/v1/chat/completions",
+                    json={
+                        "model": "test",
+                        "messages": [{"role": "user", "content": "Hi"}],
+                    },
+                )
+
+        assert resp.status_code == 502
+        body = resp.get_json()
+        assert body["error"]["type"] == "api_error"

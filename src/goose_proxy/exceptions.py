@@ -1,41 +1,33 @@
+import json
 import logging
 
 import httpx
 
-from fastapi import FastAPI
-from fastapi import HTTPException
-from fastapi import Request
-from fastapi.responses import JSONResponse
+from flask import Flask
+from flask import Response
 
 
 logger = logging.getLogger(__name__)
 
 
-def _openai_error_response(status_code: int, message: str, error_type: str) -> JSONResponse:
-    """Build an OpenAI-compatible error response."""
-    return JSONResponse(
-        status_code=status_code,
-        content={
+def _openai_error_response(status_code: int, message: str, error_type: str) -> Response:
+    body = json.dumps(
+        {
             "error": {
                 "message": message,
                 "type": error_type,
                 "code": status_code,
             }
-        },
+        }
+    )
+    return Response(
+        response=body,
+        status=status_code,
+        content_type="application/json",
     )
 
 
-def _http_exception_handler(_: Request, exc: Exception) -> JSONResponse:
-    assert isinstance(exc, HTTPException)
-    return _openai_error_response(
-        status_code=exc.status_code,
-        message=str(exc.detail),
-        error_type="invalid_request_error" if exc.status_code < 500 else "server_error",
-    )
-
-
-def _http_status_error_handler(_: Request, exc: Exception) -> JSONResponse:
-    assert isinstance(exc, httpx.HTTPStatusError)
+def _http_status_error_handler(exc: httpx.HTTPStatusError) -> Response:
     status_code = exc.response.status_code
     try:
         body = exc.response.json()
@@ -50,7 +42,7 @@ def _http_status_error_handler(_: Request, exc: Exception) -> JSONResponse:
     )
 
 
-def _httpx_error_handler(_: Request, exc: Exception) -> JSONResponse:
+def _httpx_error_handler(exc: httpx.HTTPError) -> Response:
     return _openai_error_response(
         status_code=502,
         message=str(exc),
@@ -58,8 +50,6 @@ def _httpx_error_handler(_: Request, exc: Exception) -> JSONResponse:
     )
 
 
-def register_exception_handlers(app: FastAPI) -> None:
-    """Register exception handlers with the FastAPI app."""
-    app.add_exception_handler(HTTPException, _http_exception_handler)
-    app.add_exception_handler(httpx.HTTPStatusError, _http_status_error_handler)
-    app.add_exception_handler(httpx.HTTPError, _httpx_error_handler)
+def register_error_handlers(app: Flask) -> None:
+    app.register_error_handler(httpx.HTTPStatusError, _http_status_error_handler)
+    app.register_error_handler(httpx.HTTPError, _httpx_error_handler)

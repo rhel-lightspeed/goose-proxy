@@ -12,13 +12,11 @@ ExecStart=/usr/bin/goose-proxy
 # Run as an ephemeral unprivileged user
 DynamicUser=true
 
-# Filesystem: deny everything, then allowlist read-only paths
+# Filesystem: read-only except /dev, /proc, /sys
 ProtectHome=true
 ProtectSystem=strict
-TemporaryFileSystem=/:ro
-BindReadOnlyPaths=/var/lib/goose-proxy
-BindReadOnlyPaths=/etc/pki/consumer
-InaccessibleDirectories=/home
+ReadOnlyPaths=/var/lib/goose-proxy
+ReadOnlyPaths=/etc/pki/consumer
 
 # Private /tmp so the service can't snoop on other processes
 PrivateTmp=true
@@ -39,10 +37,8 @@ ProtectProc=invisible
 ProcSubset=pid
 ProtectHostname=true
 
-# Network: localhost-only IPv4
-RestrictAddressFamilies=AF_INET
-IPAddressAllow=localhost
-IPAddressDeny=any
+# Network: restrict to IPv4, IPv6, and Unix sockets
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
 # Namespace and privilege restrictions
 RestrictNamespaces=true

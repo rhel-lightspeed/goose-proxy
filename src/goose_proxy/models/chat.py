@@ -1,8 +1,4 @@
-from typing import Annotated
-from typing import Any
-from typing import Literal
-from typing import Optional
-from typing import Union
+import typing as t
 
 from pydantic import BaseModel
 from pydantic import Field
@@ -11,7 +7,7 @@ from pydantic import Field
 class TextContentPart(BaseModel):
     """A text content block in a multipart message."""
 
-    type: Literal["text"] = "text"
+    type: t.Literal["text"] = "text"
     text: str
 
 
@@ -24,12 +20,12 @@ class ImageUrlDetail(BaseModel):
 class ImageUrlContentPart(BaseModel):
     """An image_url content block in a multipart message."""
 
-    type: Literal["image_url"] = "image_url"
+    type: t.Literal["image_url"] = "image_url"
     image_url: ImageUrlDetail
 
 
-ContentPart = Annotated[
-    Union[TextContentPart, ImageUrlContentPart],
+ContentPart = t.Annotated[
+    t.Union[TextContentPart, ImageUrlContentPart],
     Field(discriminator="type"),
 ]
 
@@ -68,7 +64,7 @@ class ChatCompletionMessageToolCall(BaseModel):
     function: Function
     """The function that the model called."""
 
-    type: Literal["function"]
+    type: t.Literal["function"]
     """The type of the tool. Currently, only `function` is supported."""
 
 
@@ -76,25 +72,25 @@ class ToolFunction(BaseModel):
     """Function definition for a tool."""
 
     name: str
-    description: Optional[str] = None
-    parameters: Optional[dict[str, Any]] = None
+    description: t.Optional[str] = None
+    parameters: t.Optional[dict[str, t.Any]] = None
 
 
 class Tool(BaseModel):
     """Tool definition for function calling."""
 
-    type: Literal["function"] = "function"
+    type: t.Literal["function"] = "function"
     function: ToolFunction
 
 
 class ChatMessage(BaseModel):
     """A single message in a chat conversation."""
 
-    role: Literal["system", "user", "assistant", "tool"] = "user"
-    content: Optional[Union[str, list[ContentPart]]] = None
-    tool_calls: Optional[list[ChatCompletionMessageToolCall]] = None
-    tool_call_id: Optional[str] = None
-    name: Optional[str] = None
+    role: t.Literal["system", "user", "assistant", "tool"] = "user"
+    content: t.Optional[t.Union[str, list[ContentPart]]] = None
+    tool_calls: t.Optional[list[ChatCompletionMessageToolCall]] = None
+    tool_call_id: t.Optional[str] = None
+    name: t.Optional[str] = None
 
 
 class ChatCompletionRequest(BaseModel):
@@ -103,11 +99,13 @@ class ChatCompletionRequest(BaseModel):
     model: str = Field(..., description="Model to use for completion")
     messages: list[ChatMessage] = Field(..., description="List of messages in the conversation")
     stream: bool = Field(default=False, description="Whether to stream responses")
-    tools: Optional[list[Tool]] = Field(default=None, description="List of tools the model can call")
-    tool_choice: Optional[Union[str, dict[str, Any]]] = Field(default=None, description="Controls which tool is called")
-    temperature: Optional[float] = Field(default=None, description="Sampling temperature")
-    max_tokens: Optional[int] = Field(default=None, description="Maximum number of tokens to generate")
-    stream_options: Optional[dict[str, Any]] = Field(default=None, description="Options for streaming responses")
+    tools: t.Optional[list[Tool]] = Field(default=None, description="List of tools the model can call")
+    tool_choice: t.Optional[t.Union[str, dict[str, t.Any]]] = Field(
+        default=None, description="Controls which tool is called"
+    )
+    temperature: t.Optional[float] = Field(default=None, description="Sampling temperature")
+    max_tokens: t.Optional[int] = Field(default=None, description="Maximum number of tokens to generate")
+    stream_options: t.Optional[dict[str, t.Any]] = Field(default=None, description="Options for streaming responses")
 
 
 # --- Chat Completion response models ---
@@ -123,8 +121,8 @@ class ChatCompletionResponseMessage(BaseModel):
     """Assistant message in a chat completion response."""
 
     role: str = "assistant"
-    content: Optional[str] = None
-    tool_calls: Optional[list[ChatCompletionMessageToolCall]] = None
+    content: t.Optional[str] = None
+    tool_calls: t.Optional[list[ChatCompletionMessageToolCall]] = None
 
 
 class Choice(BaseModel):
@@ -139,4 +137,4 @@ class ChatCompletion(BaseModel):
     created: int
     model: str
     choices: list[Choice]
-    usage: Optional[CompletionUsage] = None
+    usage: t.Optional[CompletionUsage] = None

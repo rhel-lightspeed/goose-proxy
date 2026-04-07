@@ -1,5 +1,7 @@
 """Translate Responses API responses to Chat Completions format."""
 
+import typing as t
+
 from goose_proxy.models.chat import ChatCompletion
 from goose_proxy.models.chat import ChatCompletionMessageToolCall
 from goose_proxy.models.chat import ChatCompletionResponseMessage
@@ -13,7 +15,7 @@ from goose_proxy.models.responses import ResponseOutputMessage
 from goose_proxy.models.responses import ResponseOutputText
 
 
-def _extract_text(output_message: ResponseOutputMessage) -> str | None:
+def _extract_text(output_message: ResponseOutputMessage) -> t.Optional[str]:
     """Extract concatenated text from a ResponseOutputMessage's content parts."""
     parts = []
     for content_part in output_message.content:
@@ -23,8 +25,8 @@ def _extract_text(output_message: ResponseOutputMessage) -> str | None:
 
 
 def _extract_tool_calls(
-    output: list[OutputItem],
-) -> list[ChatCompletionMessageToolCall] | None:
+    output: t.List[OutputItem],
+) -> t.Optional[t.List[ChatCompletionMessageToolCall]]:
     """Extract tool calls from the response output items."""
     tool_calls = []
     for item in output:
@@ -56,7 +58,7 @@ def _determine_finish_reason(
     return "stop"
 
 
-def _translate_usage(response: Response) -> CompletionUsage | None:
+def _translate_usage(response: Response) -> t.Optional[CompletionUsage]:
     """Translate Responses API usage to Chat Completions usage."""
     if response.usage is None:
         return None
@@ -68,14 +70,14 @@ def _translate_usage(response: Response) -> CompletionUsage | None:
     )
 
 
-def translate_response(response: Response, model: str | None) -> ChatCompletion:
+def translate_response(response: Response, model: t.Optional[str]) -> ChatCompletion:
     """Translate a Responses API Response into a ChatCompletion.
 
     Args:
         response: The Responses API response object.
         model: The original model name from the request, or None to use the response model.
     """
-    content: str | None = None
+    content: t.Optional[str] = None
     for item in response.output:
         if isinstance(item, ResponseOutputMessage):
             content = _extract_text(item)

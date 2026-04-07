@@ -1,6 +1,7 @@
 """Tests for Responses API streaming → Chat Completions SSE translation."""
 
 import json
+import typing as t
 
 from goose_proxy.models.responses import Response
 from goose_proxy.models.responses import ResponseCompletedEvent
@@ -34,7 +35,7 @@ def _make_usage():
     )
 
 
-def _parse_sse_line(line: str) -> dict | str:
+def _parse_sse_line(line: str) -> t.Any:
     """Parse a single SSE data line into a dict or raw string."""
     assert line.startswith("data: ")
     payload = line.removeprefix("data: ").strip()

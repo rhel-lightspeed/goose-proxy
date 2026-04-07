@@ -1,6 +1,6 @@
 """Translate Chat Completions requests to Responses API parameters."""
 
-from typing import Any
+import typing as t
 
 from goose_proxy.models.chat import ChatCompletionRequest
 from goose_proxy.models.chat import ChatMessage
@@ -10,8 +10,8 @@ from goose_proxy.models.chat import TextContentPart
 
 
 def _translate_tool_choice(
-    tool_choice: str | dict[str, Any],
-) -> str | dict[str, Any]:
+    tool_choice: t.Union[str, dict[str, t.Any]],
+) -> t.Union[str, dict[str, t.Any]]:
     """Translate tool_choice from Chat Completions to Responses API format.
 
     String values ("auto", "required", "none") pass through.
@@ -31,8 +31,8 @@ def _translate_tool_choice(
 
 
 def _translate_tools(
-    tools: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
+    tools: list[dict[str, t.Any]],
+) -> list[dict[str, t.Any]]:
     """Flatten tool definitions from Chat Completions to Responses API format.
 
     Chat Completions: {"type": "function", "function": {"name": ..., "description": ..., "parameters": ...}}
@@ -41,7 +41,7 @@ def _translate_tools(
     translated = []
     for tool in tools:
         fn = tool.get("function", {})
-        entry: dict[str, Any] = {
+        entry: dict[str, t.Any] = {
             "type": "function",
             "name": fn["name"],
         }
@@ -54,8 +54,8 @@ def _translate_tools(
 
 
 def _translate_user_content(
-    content: str | list[ContentPart] | None,
-) -> list[dict[str, Any]]:
+    content: t.Union[str, t.List[ContentPart], None],
+) -> t.List[dict[str, t.Any]]:
     """Convert user message content to Responses API content parts.
 
     Handles both plain string content and array content (text + image_url blocks).
@@ -63,7 +63,7 @@ def _translate_user_content(
     if content is None or isinstance(content, str):
         return [{"type": "input_text", "text": content or ""}]
 
-    parts: list[dict[str, Any]] = []
+    parts: list[dict[str, t.Any]] = []
     for block in content:
         if isinstance(block, TextContentPart):
             parts.append({"type": "input_text", "text": block.text})
@@ -74,14 +74,14 @@ def _translate_user_content(
 
 def _translate_messages(  # noqa: C901
     messages: list[ChatMessage],
-) -> tuple[str | None, list[dict[str, Any]]]:
+) -> tuple[t.Optional[str], t.List[dict[str, t.Any]]]:
     """Convert Chat Completions messages to Responses API input items.
 
     Returns (instructions, input_items) where instructions is the concatenated
     system messages and input_items is the list of Responses API input items.
     """
     system_parts: list[str] = []
-    input_items: list[dict[str, Any]] = []
+    input_items: list[dict[str, t.Any]] = []
 
     for msg in messages:
         if msg.role == "system":
@@ -137,14 +137,14 @@ def _translate_messages(  # noqa: C901
     return instructions, input_items
 
 
-def translate_request(request: ChatCompletionRequest) -> dict[str, Any]:
+def translate_request(request: ChatCompletionRequest) -> dict[str, t.Any]:
     """Translate a Chat Completions request into kwargs for client.responses.create().
 
     This is the main entry point for request translation.
     """
     instructions, input_items = _translate_messages(request.messages)
 
-    params: dict[str, Any] = {
+    params: dict[str, t.Any] = {
         "model": "",
         "input": input_items,
         "stream": request.stream,

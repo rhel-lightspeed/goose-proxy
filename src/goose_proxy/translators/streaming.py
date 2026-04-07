@@ -2,9 +2,9 @@
 
 import json
 import time
+import typing as t
 
 from collections.abc import AsyncIterator
-from typing import Any
 
 from goose_proxy.models.responses import ResponseCompletedEvent
 from goose_proxy.models.responses import ResponseCreatedEvent
@@ -20,9 +20,9 @@ def _make_chunk(
     request_id: str,
     model: str,
     created: int,
-    delta: dict[str, Any],
-    finish_reason: str | None = None,
-    usage: dict[str, Any] | None = None,
+    delta: dict[str, t.Any],
+    finish_reason: t.Optional[str] = None,
+    usage: t.Optional[t.Dict[str, t.Any]] = None,
 ) -> str:
     """Build a single SSE line for a Chat Completions chunk."""
     chunk = {
@@ -42,7 +42,7 @@ def _make_chunk(
     return f"data: {json.dumps(chunk)}\n\n"
 
 
-def _make_tool_call_delta(index: int, item: ResponseFunctionToolCall) -> dict[str, Any]:
+def _make_tool_call_delta(index: int, item: ResponseFunctionToolCall) -> dict[str, t.Any]:
     """Build the delta dict for a new tool call announcement."""
     return {
         "tool_calls": [
@@ -59,7 +59,7 @@ def _make_tool_call_delta(index: int, item: ResponseFunctionToolCall) -> dict[st
     }
 
 
-def _make_tool_call_arguments_delta(index: int, arguments: str) -> dict[str, Any]:
+def _make_tool_call_arguments_delta(index: int, arguments: str) -> dict[str, t.Any]:
     """Build the delta dict for incremental tool call arguments."""
     return {
         "tool_calls": [
@@ -81,7 +81,7 @@ def _determine_finish_reason(event: ResponseCompletedEvent, has_tool_calls: bool
     return reason
 
 
-def _translate_usage(event: ResponseCompletedEvent) -> dict[str, int] | None:
+def _translate_usage(event: ResponseCompletedEvent) -> t.Optional[dict[str, int]]:
     """Extract usage from a completed event into Chat Completions format."""
     if event.response.usage is None:
         return None
@@ -94,7 +94,7 @@ def _translate_usage(event: ResponseCompletedEvent) -> dict[str, int] | None:
 
 async def translate_stream(
     stream: AsyncIterator[StreamEvent],
-    model: str | None,
+    model: t.Optional[str],
 ) -> AsyncIterator[str]:
     """Translate Responses API stream events into Chat Completions SSE lines.
 

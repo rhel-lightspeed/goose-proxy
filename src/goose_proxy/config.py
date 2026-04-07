@@ -144,11 +144,11 @@ def get_settings() -> Settings:
     """
     config_path = Path(get_xdg_config_path(), *CONFIG_FILE_DEFINITION)
 
-    if config_path.exists():
-        with open(config_path, "rb") as f:
-            data = tomllib.load(f)
-    else:
+    data = {}
+    try:
+        data = config_path.read_text()
+        data = tomllib.loads(data)
+    except FileNotFoundError:
         logger.warning("Config file not found at %s, using defaults.", config_path)
-        data = {}
 
     return Settings(**data)

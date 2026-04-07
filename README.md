@@ -4,7 +4,7 @@ A lightweight API translation proxy that bridges [Goose](https://block.github.io
 
 ## Overview
 
-Goose communicate using the OpenAI Chat Completions API. The RHEL Lightspeed stack exposes the Responses API instead. Goose Proxy sits between the two, translating requests and responses on the fly so that clients and backends can each speak the format they already support.
+Goose communicates using the OpenAI Chat Completions API. The RHEL Lightspeed stack exposes the Responses API instead. Goose Proxy sits between the two, translating requests and responses on the fly so that clients and backends can each speak the format they already support.
 
 ```
 ┌────────┐  Chat Completions  ┌──────────────┐  Responses API  ┌───────────┐

@@ -36,7 +36,7 @@ Settings that control the HTTP server (uvicorn).
 
 ``port`` = *integer*
     The port to listen on.
-    **Default:** ``8080``
+    **Default:** ``7080``
 
 ``reload`` = *boolean*
     Enable automatic reloading when source files change. Intended for
@@ -54,7 +54,7 @@ Settings for communicating with the upstream Responses API server.
 
 ``endpoint`` = *string*
     The base URL of the backend API server.
-    **Default:** ``"https://0.0.0.0:8080"``
+    **Default:** ``"https://0.0.0.0:7080"``
 
 ``timeout`` = *integer*
     HTTP request timeout in seconds. This timeout covers only the initial

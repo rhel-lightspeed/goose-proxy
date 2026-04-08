@@ -38,6 +38,6 @@ clean: ## Remove build artifacts and caches
 
 .PHONY: request
 request: ## Make a test request to the v1 API
-	@curl -sX POST localhost:8000/v1/chat/completions \
+	@curl -sX POST localhost:8080/v1/chat/completions \
 		-H "Content-Type: application/json" \
 		--data '{"model": "", "messages": [{"role": "user", "content": "How do I enable SSH root login on RHEL?"}], "stream": false}' | jq

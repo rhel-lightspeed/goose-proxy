@@ -1,19 +1,20 @@
 import json
 import logging
 
-from collections.abc import AsyncIterator
+from collections.abc import Iterator
 
 import httpx
 
-from fastapi import APIRouter
-from fastapi import Request
-from fastapi.responses import StreamingResponse
+from flask import Blueprint
+from flask import current_app
+from flask import request
+from flask import Response
 
 from goose_proxy.models.chat import ChatCompletionRequest
 from goose_proxy.models.chat import ModelInfo
 from goose_proxy.models.chat import ModelsResponse
 from goose_proxy.models.responses import parse_stream_event
-from goose_proxy.models.responses import Response
+from goose_proxy.models.responses import Response as ResponsesAPIResponse
 from goose_proxy.models.responses import StreamEvent
 from goose_proxy.translators import translate_request
 from goose_proxy.translators import translate_response
@@ -22,28 +23,26 @@ from goose_proxy.translators import translate_stream
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+bp = Blueprint("v1", __name__)
 
 
-async def create_response(client: httpx.AsyncClient, **params) -> Response:
-    """Create a response via the Responses API."""
-    resp = await client.post("/responses", json=params)
+def create_response(client: httpx.Client, **params) -> ResponsesAPIResponse:
+    resp = client.post("/responses", json=params)
     resp.raise_for_status()
-    return Response.model_validate(resp.json())
+    return ResponsesAPIResponse.model_validate(resp.json())
 
 
-async def stream_response(client: httpx.AsyncClient, **params) -> AsyncIterator[StreamEvent]:
-    """Stream a response and yield parsed event models."""
-    async with client.stream(
+def stream_response(client: httpx.Client, **params) -> Iterator[StreamEvent]:
+    with client.stream(
         "POST",
         "/responses",
         json=params,
     ) as resp:
         if resp.is_error:
-            await resp.aread()
+            resp.read()
             resp.raise_for_status()
 
-        async for line in resp.aiter_lines():
+        for line in resp.iter_lines():
             line = line.strip()
             if not line or line.startswith("event:"):
                 continue
@@ -61,35 +60,51 @@ async def stream_response(client: httpx.AsyncClient, **params) -> AsyncIterator[
                     yield event
 
 
-@router.post("/chat/completions", response_model_exclude_none=True)
-async def chat_completions(request: Request, data: ChatCompletionRequest):
-    client: httpx.AsyncClient = request.app.state.http_client
+@bp.post("/chat/completions")
+def chat_completions():
+    from pydantic import ValidationError
+
+    try:
+        data = ChatCompletionRequest.model_validate(request.get_json())
+    except ValidationError as exc:
+        return Response(
+            response=json.dumps({"detail": exc.errors()}),
+            status=422,
+            content_type="application/json",
+        )
+
+    client: httpx.Client = current_app.config["http_client"]
     params = translate_request(data)
     if data.stream:
         stream = stream_response(client, **params)
 
-        async def generate():
-            async for line in translate_stream(stream, data.model):
+        def generate():
+            for line in translate_stream(stream, data.model):
                 yield line
 
-        return StreamingResponse(generate(), media_type="text/event-stream")
+        return Response(generate(), content_type="text/event-stream")
 
-    response = await create_response(client, **params)
-    return translate_response(response, data.model)
+    response = create_response(client, **params)
+    result = translate_response(response, data.model)
+    return Response(
+        response=result.model_dump_json(exclude_none=True),
+        status=200,
+        content_type="application/json",
+    )
 
 
-@router.get("/models")
-async def list_models(_: Request) -> ModelsResponse:
-    """Return fixed model info instead of querying the backend.
-
-    Always returns 'rhel-lightspeed/goose' as the available model.
-    This simplifies the proxy by avoiding dynamic model lookups.
-    """
-    return ModelsResponse(
+@bp.get("/models")
+def list_models():
+    result = ModelsResponse(
         data=[
             ModelInfo(
                 id="rhel-lightspeed/goose",
                 owned_by="rhel-lightspeed",
             )
         ]
+    )
+    return Response(
+        response=result.model_dump_json(),
+        status=200,
+        content_type="application/json",
     )

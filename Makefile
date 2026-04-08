@@ -7,23 +7,23 @@ help: ## Show this help message
 
 .PHONY: dev
 dev: ## Run development API
-	uv run fastapi dev src/goose_proxy/app.py
+	uv run --locked flask --app goose_proxy.app:app run --debug --reload
 
 .PHONY: test
 test: ## Run tests
-	uv run pytest
+	uv run --locked pytest
 
 .PHONY: lint
 lint: ## Run linter checks
-	uv run ruff check src/ tests/
+	uv run --locked ruff check src/ tests/
 
 .PHONY: check
 check: ## Run ty checks
-	uv run ty check src
+	uv run --locked ty check src
 
 .PHONY: format
 format: ## Format code
-	uv run ruff format src/ tests/
+	uv run --locked ruff format src/ tests/
 
 .PHONY: man
 man: ## Build man pages with Sphinx

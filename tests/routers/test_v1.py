@@ -1,19 +1,12 @@
-"""Tests for the v1 router endpoints."""
-
 import json
 
-from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import httpx
 import pytest
 
-from fastapi.testclient import TestClient
-
-from goose_proxy.app import app
-from goose_proxy.config import Backend
-from goose_proxy.config import Settings
+from goose_proxy.app import create_app
 from goose_proxy.models.responses import Response
 from goose_proxy.models.responses import ResponseCompletedEvent
 from goose_proxy.models.responses import ResponseCreatedEvent
@@ -75,18 +68,12 @@ def _make_tool_call_response():
 
 @pytest.fixture
 def test_client():
-    """FastAPI test client with mocked config."""
-    mock_settings = MagicMock(spec=Settings)
-    mock_settings.backend = MagicMock(spec=Backend)
-    mock_settings.backend.timeout = 30
+    app = create_app()
+    app.config["TESTING"] = True
+    app.config["http_client"] = MagicMock(spec=httpx.Client)
 
-    original_client = getattr(app.state, "http_client", None)
-    app.state.http_client = MagicMock()
-
-    with patch("goose_proxy.middleware.get_settings", return_value=mock_settings):
-        yield TestClient(app, raise_server_exceptions=False)
-
-    app.state.http_client = original_client
+    with app.test_client() as client:
+        yield client
 
 
 @pytest.fixture
@@ -106,7 +93,6 @@ class TestChatCompletions:
     def test_chat_completions_success(self, test_client, text_response_fixture):
         with patch(
             "goose_proxy.routers.v1.create_response",
-            new_callable=AsyncMock,
             return_value=text_response_fixture,
         ):
             resp = test_client.post(
@@ -116,8 +102,9 @@ class TestChatCompletions:
                     "messages": [{"role": "user", "content": "Hello"}],
                 },
             )
+
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.get_json()
         assert data["object"] == "chat.completion"
         assert data["choices"][0]["message"]["content"] == "Hello!"
         assert data["choices"][0]["finish_reason"] == "stop"
@@ -125,7 +112,6 @@ class TestChatCompletions:
     def test_chat_completions_with_tools(self, test_client, tool_call_response_fixture):
         with patch(
             "goose_proxy.routers.v1.create_response",
-            new_callable=AsyncMock,
             return_value=tool_call_response_fixture,
         ):
             resp = test_client.post(
@@ -145,8 +131,9 @@ class TestChatCompletions:
                     ],
                 },
             )
+
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.get_json()
         assert data["choices"][0]["finish_reason"] == "tool_calls"
         tc = data["choices"][0]["message"]["tool_calls"]
         assert len(tc) == 1
@@ -196,9 +183,8 @@ class TestChatCompletions:
             ),
         ]
 
-        async def mock_stream(*args, **kwargs):
-            for e in events:
-                yield e
+        def mock_stream(*args, **kwargs):
+            yield from events
 
         with patch("goose_proxy.routers.v1.stream_response", side_effect=mock_stream):
             resp = test_client.post(
@@ -209,14 +195,14 @@ class TestChatCompletions:
                     "stream": True,
                 },
             )
-        assert resp.status_code == 200
-        assert "text/event-stream" in resp.headers["content-type"]
 
-        lines = [line for line in resp.text.split("\n\n") if line.strip()]
+        assert resp.status_code == 200
+        assert "text/event-stream" in resp.content_type
+
+        lines = [line for line in resp.get_data(as_text=True).split("\n\n") if line.strip()]
         assert len(lines) >= 3  # role + text + completed + [DONE]
         assert lines[-1].strip() == "data: [DONE]"
 
-        # Check first data chunk has role
         first = json.loads(lines[0].removeprefix("data: "))
         assert first["choices"][0]["delta"]["role"] == "assistant"
 
@@ -229,7 +215,6 @@ class TestChatCompletions:
 
         with patch(
             "goose_proxy.routers.v1.create_response",
-            new_callable=AsyncMock,
             side_effect=httpx.HTTPStatusError(
                 message="Not Found",
                 request=httpx.Request("POST", "http://test"),
@@ -243,8 +228,9 @@ class TestChatCompletions:
                     "messages": [{"role": "user", "content": "Hi"}],
                 },
             )
+
         assert resp.status_code == 404
-        data = resp.json()
+        data = resp.get_json()
         assert data["error"]["message"] == "Model not found"
 
     def test_chat_completions_invalid_request(self, test_client):
@@ -252,6 +238,7 @@ class TestChatCompletions:
             "/v1/chat/completions",
             json={"messages": [{"role": "user", "content": "Hi"}]},
         )
+
         assert resp.status_code == 422
 
 
@@ -261,15 +248,17 @@ class TestChatCompletions:
 class TestModels:
     def test_list_models_success(self, test_client):
         resp = test_client.get("/v1/models")
+
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.get_json()
         assert data["object"] == "list"
         assert len(data["data"]) == 1
         assert data["data"][0]["id"] == "rhel-lightspeed/goose"
 
     def test_list_models_owned_by(self, test_client):
         resp = test_client.get("/v1/models")
-        data = resp.json()
+
+        data = resp.get_json()
         assert data["data"][0]["owned_by"] == "rhel-lightspeed"
 
 
@@ -279,4 +268,5 @@ class TestModels:
 class TestHealth:
     def test_health_check(self, test_client):
         resp = test_client.get("/health")
+
         assert resp.status_code == 200

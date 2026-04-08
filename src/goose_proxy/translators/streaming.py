@@ -1,10 +1,8 @@
-"""Translate Responses API streaming events to Chat Completions SSE chunks."""
-
 import json
 import time
 import typing as t
 
-from collections.abc import AsyncIterator
+from collections.abc import Iterator
 
 from goose_proxy.models.responses import ResponseCompletedEvent
 from goose_proxy.models.responses import ResponseCreatedEvent
@@ -24,7 +22,6 @@ def _make_chunk(
     finish_reason: t.Optional[str] = None,
     usage: t.Optional[t.Dict[str, t.Any]] = None,
 ) -> str:
-    """Build a single SSE line for a Chat Completions chunk."""
     chunk = {
         "id": request_id,
         "object": "chat.completion.chunk",
@@ -43,7 +40,6 @@ def _make_chunk(
 
 
 def _make_tool_call_delta(index: int, item: ResponseFunctionToolCall) -> dict[str, t.Any]:
-    """Build the delta dict for a new tool call announcement."""
     return {
         "tool_calls": [
             {
@@ -60,7 +56,6 @@ def _make_tool_call_delta(index: int, item: ResponseFunctionToolCall) -> dict[st
 
 
 def _make_tool_call_arguments_delta(index: int, arguments: str) -> dict[str, t.Any]:
-    """Build the delta dict for incremental tool call arguments."""
     return {
         "tool_calls": [
             {
@@ -72,7 +67,6 @@ def _make_tool_call_arguments_delta(index: int, arguments: str) -> dict[str, t.A
 
 
 def _determine_finish_reason(event: ResponseCompletedEvent, has_tool_calls: bool) -> str:
-    """Determine finish_reason from a completed event."""
     reason = "stop"
     if has_tool_calls:
         reason = "tool_calls"
@@ -82,7 +76,6 @@ def _determine_finish_reason(event: ResponseCompletedEvent, has_tool_calls: bool
 
 
 def _translate_usage(event: ResponseCompletedEvent) -> t.Optional[dict[str, int]]:
-    """Extract usage from a completed event into Chat Completions format."""
     if event.response.usage is None:
         return None
     return {
@@ -92,14 +85,14 @@ def _translate_usage(event: ResponseCompletedEvent) -> t.Optional[dict[str, int]
     }
 
 
-async def translate_stream(
-    stream: AsyncIterator[StreamEvent],
+def translate_stream(
+    stream: Iterator[StreamEvent],
     model: t.Optional[str],
-) -> AsyncIterator[str]:
+) -> Iterator[str]:
     """Translate Responses API stream events into Chat Completions SSE lines.
 
     Args:
-        stream: Async iterator of streaming event objects from the backend.
+        stream: Iterator of streaming event objects from the backend.
         model: The original model name from the request, or None to use the response model.
 
     Yields:
@@ -112,7 +105,7 @@ async def translate_stream(
     has_tool_calls = False
     sent_role = False
 
-    async for event in stream:
+    for event in stream:
         if isinstance(event, ResponseCreatedEvent):
             request_id = event.response.id
             created = int(event.response.created_at)

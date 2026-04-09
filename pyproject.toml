@@ -15,6 +15,7 @@ dependencies = [
     "pydantic>=2.12.4",
     # Exists in EPEL9/EPEL10
     "fastapi[standard-no-fastapi-cloud-cli]>=0.121.2",
+    "openai>=2.21.0",
 ]
 requires-python = ">=3.9"  # RHEL 9 and 10
 license-files = ["LICENSE"]

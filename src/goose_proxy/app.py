@@ -6,6 +6,7 @@ import httpx
 import uvicorn
 
 from fastapi import FastAPI
+from openai import AsyncOpenAI
 
 from goose_proxy.config import get_settings
 from goose_proxy.exceptions import register_exception_handlers
@@ -23,15 +24,18 @@ async def lifespan(app: FastAPI):
     cert = (str(backend.auth.cert_file), str(backend.auth.key_file))
 
     http_client = httpx.AsyncClient(
-        base_url=backend.endpoint,
         cert=cert,
         timeout=backend.timeout,
         proxy=backend.proxy or None,
-        headers={"Accept": "application/json"},
     )
-    app.state.http_client = http_client
+    openai_client = AsyncOpenAI(
+        base_url=backend.endpoint,
+        api_key="",
+        http_client=http_client,
+    )
+    app.state.openai_client = openai_client
     yield
-    await http_client.aclose()
+    await openai_client.close()
 
 
 app = FastAPI(

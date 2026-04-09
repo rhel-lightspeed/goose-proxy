@@ -4,16 +4,16 @@ import json
 import time
 import typing as t
 
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 
-from goose_proxy.models.responses import ResponseCompletedEvent
-from goose_proxy.models.responses import ResponseCreatedEvent
-from goose_proxy.models.responses import ResponseFunctionCallArgumentsDeltaEvent
-from goose_proxy.models.responses import ResponseFunctionToolCall
-from goose_proxy.models.responses import ResponseOutputItemAddedEvent
-from goose_proxy.models.responses import ResponseOutputMessage
-from goose_proxy.models.responses import ResponseTextDeltaEvent
-from goose_proxy.models.responses import StreamEvent
+from openai.types.responses import ResponseCompletedEvent
+from openai.types.responses import ResponseCreatedEvent
+from openai.types.responses import ResponseFunctionCallArgumentsDeltaEvent
+from openai.types.responses import ResponseFunctionToolCall
+from openai.types.responses import ResponseOutputItemAddedEvent
+from openai.types.responses import ResponseOutputMessage
+from openai.types.responses import ResponseStreamEvent
+from openai.types.responses import ResponseTextDeltaEvent
 
 
 def _make_chunk(
@@ -95,14 +95,14 @@ def _translate_usage(event: ResponseCompletedEvent) -> t.Optional[dict[str, int]
     }
 
 
-def translate_stream(
-    stream: Iterator[StreamEvent],
+async def translate_stream(
+    stream: AsyncIterator[ResponseStreamEvent],
     model: t.Optional[str],
-) -> Iterator[str]:
+) -> AsyncIterator[str]:
     """Translate Responses API stream events into Chat Completions SSE lines.
 
     Args:
-        stream: Iterator of streaming event objects from the backend.
+        stream: Async iterator of streaming event objects from the backend.
         model: The original model name from the request, or None to use the response model.
 
     Yields:
@@ -115,7 +115,7 @@ def translate_stream(
     has_tool_calls = False
     sent_role = False
 
-    for event in stream:
+    async for event in stream:
         if isinstance(event, ResponseCreatedEvent):
             request_id = event.response.id
             created = int(event.response.created_at)

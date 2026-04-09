@@ -1,17 +1,16 @@
-import io
 import json
-import urllib.error
 
 from unittest.mock import MagicMock
 
-import pytest
+import httpx
+import openai
 
 from fastapi import HTTPException
 
+from goose_proxy.exceptions import _api_connection_error_handler
+from goose_proxy.exceptions import _api_status_error_handler
 from goose_proxy.exceptions import _cert_error_handler
-from goose_proxy.exceptions import _http_error_handler
 from goose_proxy.exceptions import _http_exception_handler
-from goose_proxy.exceptions import _url_error_handler
 from goose_proxy.exceptions import CertificateInitializationError
 
 
@@ -19,20 +18,8 @@ def _dummy_request():
     return MagicMock()
 
 
-@pytest.fixture
-def make_http_error():
-    def _make_http_error(code, body):
-        fp = io.BytesIO(body.encode())
-
-        return urllib.error.HTTPError(
-            url="http://test/responses",
-            code=code,
-            msg="",
-            hdrs=None,
-            fp=fp,
-        )
-
-    return _make_http_error
+def _parse(resp):
+    return json.loads(resp.body)
 
 
 class TestHttpExceptionHandler:
@@ -83,62 +70,87 @@ class TestHttpExceptionHandler:
         assert body["error"]["type"] == "server_error"
 
 
-class TestHttpErrorHandler:
-    def test_extracts_message_from_json_error(self, make_http_error):
-        exc = make_http_error(422, '{"error": {"message": "Invalid parameters"}}')
-
-        resp = _http_error_handler(_dummy_request(), exc)
-        body = json.loads(resp.body)
-
+class TestApiStatusErrorHandler:
+    def test_extracts_message_from_json_error(self):
+        response = httpx.Response(
+            status_code=422,
+            json={"error": {"message": "Invalid parameters"}},
+            request=httpx.Request("POST", "http://test"),
+        )
+        exc = openai.APIStatusError(
+            message="Unprocessable",
+            response=response,
+            body={"error": {"message": "Invalid parameters"}},
+        )
+        resp = _api_status_error_handler(_dummy_request(), exc)
+        body = _parse(resp)
         assert resp.status_code == 422
         assert body["error"]["message"] == "Invalid parameters"
         assert body["error"]["type"] == "api_error"
 
-    def test_falls_back_to_text_on_non_json(self, make_http_error):
-        exc = make_http_error(500, "Internal Server Error")
-
-        resp = _http_error_handler(_dummy_request(), exc)
-        body = json.loads(resp.body)
-
+    def test_falls_back_to_str_on_no_body(self):
+        response = httpx.Response(
+            status_code=500,
+            text="Internal Server Error",
+            request=httpx.Request("POST", "http://test"),
+        )
+        exc = openai.APIStatusError(
+            message="Server Error",
+            response=response,
+            body=None,
+        )
+        resp = _api_status_error_handler(_dummy_request(), exc)
+        body = _parse(resp)
         assert resp.status_code == 500
-        assert body["error"]["message"] == "Internal Server Error"
+        assert "Server Error" in body["error"]["message"]
 
-    def test_falls_back_to_str_exc_when_no_message_key(self, make_http_error):
-        exc = make_http_error(503, '{"detail": "Service unavailable"}')
-
-        resp = _http_error_handler(_dummy_request(), exc)
-        body = json.loads(resp.body)
-
+    def test_falls_back_to_str_exc_when_no_message_key(self):
+        response = httpx.Response(
+            status_code=503,
+            json={"detail": "Service unavailable"},
+            request=httpx.Request("POST", "http://test"),
+        )
+        exc = openai.APIStatusError(
+            message="Unavailable",
+            response=response,
+            body={"detail": "Service unavailable"},
+        )
+        resp = _api_status_error_handler(_dummy_request(), exc)
+        body = _parse(resp)
         assert resp.status_code == 503
-        assert "503" in body["error"]["message"]
+        # Falls back to str(exc) since error.message is missing
+        assert "Unavailable" in body["error"]["message"]
 
-    def test_preserves_status_code(self, make_http_error):
-        exc = make_http_error(429, '{"error": {"message": "Rate limited"}}')
-
-        resp = _http_error_handler(_dummy_request(), exc)
-
+    def test_preserves_status_code(self):
+        response = httpx.Response(
+            status_code=429,
+            json={"error": {"message": "Rate limited"}},
+            request=httpx.Request("POST", "http://test"),
+        )
+        exc = openai.APIStatusError(
+            message="Too Many",
+            response=response,
+            body={"error": {"message": "Rate limited"}},
+        )
+        resp = _api_status_error_handler(_dummy_request(), exc)
         assert resp.status_code == 429
 
 
-class TestUrlErrorHandler:
+class TestApiConnectionErrorHandler:
     def test_connection_error_returns_502(self):
-        exc = urllib.error.URLError("Connection refused")
-
-        resp = _url_error_handler(_dummy_request(), exc)
-        body = json.loads(resp.body)
-
+        exc = openai.APIConnectionError(request=httpx.Request("POST", "http://test"))
+        resp = _api_connection_error_handler(_dummy_request(), exc)
+        body = _parse(resp)
         assert resp.status_code == 502
         assert body["error"]["type"] == "api_error"
-        assert "Connection refused" in body["error"]["message"]
 
     def test_timeout_error_returns_502(self):
-        exc = urllib.error.URLError("Read timed out")
-
-        resp = _url_error_handler(_dummy_request(), exc)
-        body = json.loads(resp.body)
-
+        exc = openai.APITimeoutError(request=httpx.Request("POST", "http://test"))
+        resp = _api_connection_error_handler(_dummy_request(), exc)
         assert resp.status_code == 502
-        assert "Read timed out" in body["error"]["message"]
+        body = _parse(resp)
+        assert body["error"]["type"] == "api_error"
+        assert body["error"]["code"] == 502
 
 
 class TestCertErrorHandler:
@@ -148,11 +160,10 @@ class TestCertErrorHandler:
         exc.__cause__ = cause
 
         resp = _cert_error_handler(_dummy_request(), exc)
-        body = json.loads(resp.body)
+        body = _parse(resp)
 
         assert resp.status_code == 502
         assert body["error"]["type"] == "server_error"
         assert "System is not registered" in body["error"]["message"]
         assert "subscription-manager register" in body["error"]["message"]
-        # Raw exception details must not leak to the client
         assert "/etc/pki" not in body["error"]["message"]

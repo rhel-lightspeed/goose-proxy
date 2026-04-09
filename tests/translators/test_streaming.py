@@ -1,34 +1,40 @@
+import asyncio
 import json
 import typing as t
 
 import pytest
 
-from goose_proxy.models.responses import Response
-from goose_proxy.models.responses import ResponseCompletedEvent
-from goose_proxy.models.responses import ResponseCreatedEvent
-from goose_proxy.models.responses import ResponseFunctionCallArgumentsDeltaEvent
-from goose_proxy.models.responses import ResponseFunctionToolCall
-from goose_proxy.models.responses import ResponseOutputItemAddedEvent
-from goose_proxy.models.responses import ResponseOutputMessage
-from goose_proxy.models.responses import ResponseTextDeltaEvent
-from goose_proxy.models.responses import ResponseUsage
+from openai.types.responses import Response
+from openai.types.responses import ResponseCompletedEvent
+from openai.types.responses import ResponseCreatedEvent
+from openai.types.responses import ResponseFunctionCallArgumentsDeltaEvent
+from openai.types.responses import ResponseFunctionToolCall
+from openai.types.responses import ResponseOutputItemAddedEvent
+from openai.types.responses import ResponseOutputMessage
+from openai.types.responses import ResponseTextDeltaEvent
+from openai.types.responses import ResponseUsage
+
 from goose_proxy.translators.streaming import translate_stream
+
+
+def _make_base_response(response_id="resp_1", status="in_progress", output=None, usage=None):
+    return Response(
+        id=response_id,
+        created_at=1700000000,
+        model="rhel-lightspeed/vertex",
+        object="response",
+        output=output or [],
+        parallel_tool_calls=True,
+        tool_choice="auto",
+        tools=[],
+        status=status,
+        usage=usage,
+    )
 
 
 @pytest.fixture
 def base_response():
-    def _base_response(response_id="resp_1", status="in_progress", output=None, usage=None):
-        return Response(
-            id=response_id,
-            created_at=1700000000,
-            model="rhel-lightspeed/vertex",
-            object="response",
-            output=output or [],
-            status=status,
-            usage=usage,
-        )
-
-    return _base_response
+    return _make_base_response
 
 
 @pytest.fixture
@@ -37,6 +43,20 @@ def response_usage():
         input_tokens=10,
         output_tokens=5,
         total_tokens=15,
+        input_tokens_details={"cached_tokens": 0},
+        output_tokens_details={"reasoning_tokens": 0},
+    )
+
+
+def _make_text_delta(delta, item_id="m1", output_index=0, sequence_number=1):
+    return ResponseTextDeltaEvent(
+        content_index=0,
+        delta=delta,
+        item_id=item_id,
+        output_index=output_index,
+        sequence_number=sequence_number,
+        type="response.output_text.delta",
+        logprobs=[],
     )
 
 
@@ -56,7 +76,14 @@ def parse_sse_line():
 @pytest.fixture
 def collect_chunks():
     def _collect_chunks(events, model="rhel-lightspeed/vertex"):
-        return list(translate_stream(iter(events), model))
+        async def _run():
+            async def _aiter():
+                for e in events:
+                    yield e
+
+            return [chunk async for chunk in translate_stream(_aiter(), model)]
+
+        return asyncio.run(_run())
 
     return _collect_chunks
 
@@ -86,14 +113,7 @@ class TestTextStreaming:
                 sequence_number=0,
                 type="response.created",
             ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="Hello",
-                item_id="msg_1",
-                output_index=0,
-                sequence_number=1,
-                type="response.output_text.delta",
-            ),
+            _make_text_delta("Hello"),
         ]
 
         chunks = collect_chunks(events)
@@ -108,22 +128,8 @@ class TestTextStreaming:
                 sequence_number=0,
                 type="response.created",
             ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="Hel",
-                item_id="m1",
-                output_index=0,
-                sequence_number=1,
-                type="response.output_text.delta",
-            ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="lo!",
-                item_id="m1",
-                output_index=0,
-                sequence_number=2,
-                type="response.output_text.delta",
-            ),
+            _make_text_delta("Hel", sequence_number=1),
+            _make_text_delta("lo!", sequence_number=2),
         ]
 
         chunks = collect_chunks(events)
@@ -138,14 +144,7 @@ class TestTextStreaming:
                 sequence_number=0,
                 type="response.created",
             ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="",
-                item_id="m1",
-                output_index=0,
-                sequence_number=1,
-                type="response.output_text.delta",
-            ),
+            _make_text_delta(""),
         ]
 
         chunks = collect_chunks(events)
@@ -306,14 +305,7 @@ class TestToolCallStreaming:
                 sequence_number=2,
                 type="response.output_item.added",
             ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="Hi",
-                item_id="msg_1",
-                output_index=1,
-                sequence_number=3,
-                type="response.output_text.delta",
-            ),
+            _make_text_delta("Hi", item_id="msg_1", output_index=1, sequence_number=3),
         ]
 
         chunks = collect_chunks(events)
@@ -369,14 +361,7 @@ class TestStreamLifecycle:
                 sequence_number=0,
                 type="response.created",
             ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="Hi",
-                item_id="m1",
-                output_index=0,
-                sequence_number=1,
-                type="response.output_text.delta",
-            ),
+            _make_text_delta("Hi"),
             ResponseCompletedEvent(
                 response=base_response(status="completed", usage=response_usage),
                 sequence_number=2,
@@ -429,14 +414,7 @@ class TestStreamLifecycle:
                 sequence_number=0,
                 type="response.created",
             ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="Partial",
-                item_id="m1",
-                output_index=0,
-                sequence_number=1,
-                type="response.output_text.delta",
-            ),
+            _make_text_delta("Partial"),
             ResponseCompletedEvent(
                 response=base_response(status="incomplete", usage=response_usage),
                 sequence_number=2,
@@ -497,14 +475,7 @@ class TestSSEFormat:
                 sequence_number=0,
                 type="response.created",
             ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="Hi",
-                item_id="m1",
-                output_index=0,
-                sequence_number=1,
-                type="response.output_text.delta",
-            ),
+            _make_text_delta("Hi"),
         ]
 
         chunks = collect_chunks(events)

@@ -16,6 +16,8 @@ dependencies = [
     "pydantic>=2.12.4",
     "fastapi>=0.121.2",
     "uvicorn>=0.38.0",
+    "openai>=2.21.0",
+    "httpx>=0.28",
 ]
 # Python 3.9 is the minimum version available in RHEL 9, our lowest target.
 requires-python = ">=3.9"
@@ -59,7 +61,6 @@ lint = [
 ]
 
 test = [
-    "httpx>=0.28",
     "pytest-asyncio>=0.25",
     "pytest-cov>=7.0.0",
     "pytest>=8.0",

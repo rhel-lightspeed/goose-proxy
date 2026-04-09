@@ -100,8 +100,11 @@ def _resolve_credential(name: str, fallback: str) -> Path:
     checks there first and falls back to the traditional filesystem path.
     """
     creds_dir = os.getenv("CREDENTIALS_DIRECTORY")
+    print("creds_dir: ", creds_dir)
     if creds_dir:
         cred_path = Path(creds_dir) / name
+        print("creds_path: ", cred_path)
+        print("creds_path_exists: ", cred_path.exists())
         if cred_path.exists():
             return cred_path
 

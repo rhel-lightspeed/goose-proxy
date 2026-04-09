@@ -3,15 +3,16 @@
 import json
 import typing as t
 
-from goose_proxy.models.responses import Response
-from goose_proxy.models.responses import ResponseCompletedEvent
-from goose_proxy.models.responses import ResponseCreatedEvent
-from goose_proxy.models.responses import ResponseFunctionCallArgumentsDeltaEvent
-from goose_proxy.models.responses import ResponseFunctionToolCall
-from goose_proxy.models.responses import ResponseOutputItemAddedEvent
-from goose_proxy.models.responses import ResponseOutputMessage
-from goose_proxy.models.responses import ResponseTextDeltaEvent
-from goose_proxy.models.responses import ResponseUsage
+from openai.types.responses import Response
+from openai.types.responses import ResponseCompletedEvent
+from openai.types.responses import ResponseCreatedEvent
+from openai.types.responses import ResponseFunctionCallArgumentsDeltaEvent
+from openai.types.responses import ResponseFunctionToolCall
+from openai.types.responses import ResponseOutputItemAddedEvent
+from openai.types.responses import ResponseOutputMessage
+from openai.types.responses import ResponseTextDeltaEvent
+from openai.types.responses import ResponseUsage
+
 from goose_proxy.translators.streaming import translate_stream
 
 
@@ -22,6 +23,9 @@ def _make_base_response(response_id="resp_1", status="in_progress", output=None,
         model="rhel-lightspeed/vertex",
         object="response",
         output=output or [],
+        parallel_tool_calls=True,
+        tool_choice="auto",
+        tools=[],
         status=status,
         usage=usage,
     )
@@ -32,6 +36,20 @@ def _make_usage():
         input_tokens=10,
         output_tokens=5,
         total_tokens=15,
+        input_tokens_details={"cached_tokens": 0},
+        output_tokens_details={"reasoning_tokens": 0},
+    )
+
+
+def _make_text_delta(delta, item_id="m1", output_index=0, sequence_number=1):
+    return ResponseTextDeltaEvent(
+        content_index=0,
+        delta=delta,
+        item_id=item_id,
+        output_index=output_index,
+        sequence_number=sequence_number,
+        type="response.output_text.delta",
+        logprobs=[],
     )
 
 
@@ -80,14 +98,7 @@ class TestTextStreaming:
                 sequence_number=0,
                 type="response.created",
             ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="Hello",
-                item_id="msg_1",
-                output_index=0,
-                sequence_number=1,
-                type="response.output_text.delta",
-            ),
+            _make_text_delta("Hello"),
         ]
         chunks = await _collect_chunks(events)
         data = _parse_sse_line(chunks[1])
@@ -100,22 +111,8 @@ class TestTextStreaming:
                 sequence_number=0,
                 type="response.created",
             ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="Hel",
-                item_id="m1",
-                output_index=0,
-                sequence_number=1,
-                type="response.output_text.delta",
-            ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="lo!",
-                item_id="m1",
-                output_index=0,
-                sequence_number=2,
-                type="response.output_text.delta",
-            ),
+            _make_text_delta("Hel", sequence_number=1),
+            _make_text_delta("lo!", sequence_number=2),
         ]
         chunks = await _collect_chunks(events)
         # role chunk + 2 text chunks + [DONE]
@@ -129,14 +126,7 @@ class TestTextStreaming:
                 sequence_number=0,
                 type="response.created",
             ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="",
-                item_id="m1",
-                output_index=0,
-                sequence_number=1,
-                type="response.output_text.delta",
-            ),
+            _make_text_delta(""),
         ]
         chunks = await _collect_chunks(events)
         data = _parse_sse_line(chunks[1])
@@ -290,14 +280,7 @@ class TestToolCallStreaming:
                 sequence_number=2,
                 type="response.output_item.added",
             ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="Hi",
-                item_id="msg_1",
-                output_index=1,
-                sequence_number=3,
-                type="response.output_text.delta",
-            ),
+            _make_text_delta("Hi", item_id="msg_1", output_index=1, sequence_number=3),
         ]
         chunks = await _collect_chunks(events)
         # role, tool_call, text, [DONE]
@@ -347,14 +330,7 @@ class TestStreamLifecycle:
                 sequence_number=0,
                 type="response.created",
             ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="Hi",
-                item_id="m1",
-                output_index=0,
-                sequence_number=1,
-                type="response.output_text.delta",
-            ),
+            _make_text_delta("Hi"),
             ResponseCompletedEvent(
                 response=_make_base_response(status="completed", usage=_make_usage()),
                 sequence_number=2,
@@ -404,14 +380,7 @@ class TestStreamLifecycle:
                 sequence_number=0,
                 type="response.created",
             ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="Partial",
-                item_id="m1",
-                output_index=0,
-                sequence_number=1,
-                type="response.output_text.delta",
-            ),
+            _make_text_delta("Partial"),
             ResponseCompletedEvent(
                 response=_make_base_response(status="incomplete", usage=_make_usage()),
                 sequence_number=2,
@@ -466,14 +435,7 @@ class TestSSEFormat:
                 sequence_number=0,
                 type="response.created",
             ),
-            ResponseTextDeltaEvent(
-                content_index=0,
-                delta="Hi",
-                item_id="m1",
-                output_index=0,
-                sequence_number=1,
-                type="response.output_text.delta",
-            ),
+            _make_text_delta("Hi"),
         ]
         chunks = await _collect_chunks(events)
         for chunk in chunks:

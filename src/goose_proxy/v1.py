@@ -82,14 +82,14 @@ async def chat_completions(request: Request, data: ChatCompletionRequest):
 async def list_models(_: Request) -> ModelsResponse:
     """Return fixed model info instead of querying the backend.
 
-    Always returns 'rhel-lightspeed/goose' as the available model.
+    Always returns 'RHEL-command-line-assistant' as the available model.
     This simplifies the proxy by avoiding dynamic model lookups.
     """
     return ModelsResponse(
         data=[
             ModelInfo(
-                id="rhel-lightspeed/goose",
-                owned_by="rhel-lightspeed",
+                id="RHEL-command-line-assistant",
+                owned_by="command-line-assistant",
             )
         ]
     )

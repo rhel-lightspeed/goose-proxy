@@ -36,7 +36,7 @@ class ModelInfo(BaseModel):
     id: str
     object: str = "model"
     created: int = 0
-    owned_by: str = "rhel-lightspeed"
+    owned_by: str = "command-line-assistant"
 
 
 class ModelsResponse(BaseModel):

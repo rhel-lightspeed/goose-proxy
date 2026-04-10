@@ -14,7 +14,7 @@ dependencies = [
     "fastapi[standard-no-fastapi-cloud-cli]>=0.121.2",
     "uvicorn>=0.38.0",
 ]
-# Python 3.9 is the minimum version available in RHEL.
+# Python 3.9 is the minimum version available in RHEL 9, our lowest target. 
 requires-python = ">=3.9"
 license-files = ["LICENSE"]
 dynamic = ["version"]

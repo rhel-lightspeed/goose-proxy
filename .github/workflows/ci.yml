@@ -10,7 +10,7 @@ on:
       - main
 
 jobs:
-  lint:
+  quality:
     name: Sanity
     runs-on: ubuntu-latest
 
@@ -38,6 +38,9 @@ jobs:
 
       - name: Format
         run: uv run --locked ruff format --diff src/ tests/
+
+      - name: Check
+        run: uv run --locked ty check  src/
 
   test:
     name: Unit - ${{ matrix.python-version }}

@@ -265,12 +265,12 @@ class TestModels:
         data = resp.json()
         assert data["object"] == "list"
         assert len(data["data"]) == 1
-        assert data["data"][0]["id"] == "rhel-lightspeed/goose"
+        assert data["data"][0]["id"] == "RHEL-command-line-assistant"
 
     def test_list_models_owned_by(self, test_client):
         resp = test_client.get("/v1/models")
         data = resp.json()
-        assert data["data"][0]["owned_by"] == "rhel-lightspeed"
+        assert data["data"][0]["owned_by"] == "command-line-assistant"
 
 
 # --- Health endpoint ---

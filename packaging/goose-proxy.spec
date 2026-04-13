@@ -37,6 +37,9 @@ BuildRequires:  python3-sphinx
 BuildRequires:  selinux-policy-devel
 BuildRequires:  bzip2
 
+# Add selinux subpackage as dependency
+Requires:       %{name}-selinux
+
 
 %description
 A lightweight API translation proxy that bridges Goose with backend servers
@@ -69,9 +72,6 @@ sphinx-build -b man docs/man docs/build/man
 # Build SELinux policy module
 %{__make} -C data/release/selinux %{modulename}.pp.bz2
 
-# Generate SELinux module man page
-%{__make} -C data/release/selinux man
-
 %install
 %pyproject_install
 %pyproject_save_files -l goose_proxy
@@ -102,9 +102,6 @@ sphinx-build -b man docs/man docs/build/man
 
 %{__install} -d %{buildroot}%{_datadir}/selinux/devel/include/contrib
 %{__install} -m 644 data/release/selinux/%{modulename}.if %{buildroot}%{_datadir}/selinux/devel/include/contrib/
-
-%{__install} -d %{buildroot}%{_mandir}/man8/
-%{__install} -m 644 data/release/selinux/%{modulename}_selinux.8 %{buildroot}%{_mandir}/man8/%{modulename}_selinux.8
 
 %check
 %pytest
@@ -184,7 +181,6 @@ fi
 %files          selinux
 %attr(0600,root,root) %{_datadir}/selinux/packages/%{selinuxtype}/%{modulename}.pp.bz2
 %{_datadir}/selinux/devel/include/contrib/%{modulename}.if
-%{_mandir}/man8/%{modulename}_selinux.8.*
 %ghost %verify(not md5 size mode mtime) %{_sharedstatedir}/selinux/%{selinuxtype}/active/modules/200/%{modulename}
 
 

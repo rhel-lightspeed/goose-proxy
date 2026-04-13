@@ -33,6 +33,10 @@ BuildRequires:  python3-pytest-asyncio
 # Sphinx is used to build the manpages for the project.
 BuildRequires:  python3-sphinx
 
+# SELinux policy build dependencies
+BuildRequires:  selinux-policy-devel
+BuildRequires:  bzip2
+
 
 %description
 A lightweight API translation proxy that bridges Goose with backend servers
@@ -62,6 +66,12 @@ tomcli set pyproject.toml arrays replace project.dependencies 'fastapi\[standard
 # Build the manpages
 sphinx-build -b man docs/man docs/build/man
 
+# Build SELinux policy module
+%{__make} -f data/release/selinux/Makefile %{modulename}.pp.bz2
+
+# Generate SELinux module man page
+%{__make} -f data/release/selinux/Makefile man
+
 %install
 %pyproject_install
 %pyproject_save_files -l goose_proxy
@@ -85,6 +95,16 @@ sphinx-build -b man docs/man docs/build/man
 # Install the sources into /usr/share/goose-redhat
 %{__install} -Dpm 0644 data/release/goose/config.yaml  %{buildroot}%{_datadir}/goose-redhat/config.yaml 
 %{__install} -Dpm 0644 data/release/goose/custom_goose-proxy.json %{buildroot}%{_datadir}/goose-redhat/custom_goose-proxy.json 
+
+# SELinux policy module
+%{__install} -d %{buildroot}%{_datadir}/selinux/packages/%{selinuxtype}
+%{__install} -m 644 data/release/selinux/%{modulename}.pp.bz2 %{buildroot}%{_datadir}/selinux/packages/%{selinuxtype}/%{modulename}.pp.bz2
+
+%{__install} -d %{buildroot}%{_datadir}/selinux/devel/include/contrib
+%{__install} -m 644 data/release/selinux/%{modulename}.if %{buildroot}%{_datadir}/selinux/devel/include/contrib/
+
+%{__install} -d %{buildroot}%{_mandir}/man8/
+%{__install} -m 644 data/release/selinux/%{modulename}_selinux.8 %{buildroot}%{_mandir}/man8/%{modulename}_selinux.8
 
 %check
 %pytest
@@ -141,28 +161,7 @@ Requires(post): policycoreutils-python-utils
 Requires(postun): policycoreutils-python-utils
 
 %description    selinux
-This package installs and sets up the  SELinux policy security module for %{modulename}.
-
-%prep           selinux
-
-# Build selinux policy
-%{__make} -f data/release/selinux/Makefile %{modulename}.pp.bz2
-
-# Generate a man page of the installed module
-%{__make} -f data/release/selinux/Makefile man
-
-%install        selinux
-install -d %{buildroot}%{_datadir}/selinux/packages
-install -m 644 data/release/selinux/%{modulename}.pp.bz2 %{buildroot}%{_datadir}/selinux/packages/%{selinuxtype}
-
-install -d %{buildroot}%{_datadir}/selinux/devel/include/contrib
-install -m 644 data/release/selinux/%{modulename}.if %{buildroot}%{_datadir}/selinux/devel/include/contrib/
-
-install -d %{buildroot}%{_mandir}/man8/
-install -m 644 data/release/selinux/%{modulename}_selinux.8 %{buildroot}%{_mandir}/man8/%{modulename}_selinux.8
-
-install -d %{buildroot}/etc/selinux/targeted/contexts/users/
-
+This package installs and sets up the SELinux policy security module for %{modulename}.
 
 %pre            selinux
 %selinux_relabel_pre -s %{selinuxtype}

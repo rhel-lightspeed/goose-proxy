@@ -69,6 +69,15 @@ sphinx-build -b man docs/man docs/build/man
 %{__install} -d -m 0700 %{buildroot}/%{_sysconfdir}/xdg/%{name}
 %{__install} -D -m 0600 data/release/xdg/config.toml %{buildroot}/%{_sysconfdir}/xdg/%{name}/config.toml
 
+# Red Hat specific configs
+# Install the goose-init shell script inside /etc/profile.d for automatic
+# placement of the goose-config and custom_goose-proxy on user home directory.
+%{__install} -Dpm 0755 data/release/goose/goose-init.sh %{buildroot}%{_sysconfdir}/profile.d/goose-init.sh 
+	
+# Install the sources into /usr/share/goose-redhat
+%{__install} -Dpm 0644 data/release/goose/config.yml  %{buildroot}%{_datadir}/goose-redhat/config.yml 
+%{__install} -Dpm 0644 data/release/goose/custom_goose-proxy.json %{buildroot}%{_datadir}/goose-redhat/custom_goose-proxy.json 
+
 %check
 %pytest
 
@@ -91,6 +100,23 @@ sphinx-build -b man docs/man docs/build/man
 # Config file
 %config(noreplace) %attr(0600, root, root) %{_sysconfdir}/xdg/%{name}/config.toml
 
+# ---------------- Red Hat package
+%package    -n goose-redhat
+Summary:    %{summary}
+	
+Requires:   goose
+Requires:   %{name} = %{version}-%{release}
+
+%description -n goose-redhat
+
+This package contains Red Hat specific configurations for %{name}, which enable	
+the communication with RHEL Lightspeed services.
+
+
+%files       -n goose-redhat
+%{_sysconfdir}/profile.d/goose-init.sh
+%{_datadir}/goose-redhat/config.yml
+%{_datadir}/goose-redhat/custom_goose-proxy.json
 
 %changelog
 %autochangelog

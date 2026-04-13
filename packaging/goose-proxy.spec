@@ -67,10 +67,10 @@ tomcli set pyproject.toml arrays replace project.dependencies 'fastapi\[standard
 sphinx-build -b man docs/man docs/build/man
 
 # Build SELinux policy module
-%{__make} -f data/release/selinux/Makefile %{modulename}.pp.bz2
+%{__make} -C data/release/selinux %{modulename}.pp.bz2
 
 # Generate SELinux module man page
-%{__make} -f data/release/selinux/Makefile man
+%{__make} -C data/release/selinux man
 
 %install
 %pyproject_install

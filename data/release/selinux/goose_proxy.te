@@ -38,7 +38,7 @@ corenet_tcp_bind_generic_node(goose_proxy_t)
 # ------ Network: outbound (mTLS to backend on port 443) ------
 
 corenet_tcp_connect_http_port(goose_proxy_t)
-corenet_sendrecv_client_packets(goose_proxy_t)
+corenet_sendrecv_generic_client_packets(goose_proxy_t)
 corenet_tcp_sendrecv_generic_if(goose_proxy_t)
 corenet_tcp_sendrecv_generic_node(goose_proxy_t)
 
@@ -63,8 +63,8 @@ files_read_etc_runtime_files(goose_proxy_t)
 miscfiles_read_generic_certs(goose_proxy_t)
 
 # Primary path: $CREDENTIALS_DIRECTORY set by systemd LoadCredential.
-# On older systems these files inherit init_var_run_t.
-init_read_runtime_files(goose_proxy_t)
+# On RHEL 9 these files inherit init_var_run_t.
+init_read_pid_files(goose_proxy_t)
 
 # On Fedora 40+ / RHEL 10+ they are labeled systemd_credential_t.
 optional_policy(`

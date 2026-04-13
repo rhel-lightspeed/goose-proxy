@@ -64,7 +64,7 @@ interface(`goose_proxy_connect',`
 	corenet_tcp_recvfrom_unlabeled($1)
 	corenet_tcp_sendrecv_generic_if($1)
 	corenet_tcp_sendrecv_generic_node($1)
-	corenet_sendrecv_client_packets($1)
+	corenet_sendrecv_generic_client_packets($1)
 	allow $1 goose_proxy_port_t:tcp_socket name_connect;
 ')
 

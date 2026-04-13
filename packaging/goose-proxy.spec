@@ -1,7 +1,7 @@
 Name:           goose-proxy
 Version:        0.1.0
 Release:        %autorelease
-Summary:        A proxy API for RHEL Lightspeed
+Summary:        A proxy API for RHEL command line assistant
 
 License:        Apache-2.0
 URL:            https://github.com/rhel-lightspeed/goose-proxy

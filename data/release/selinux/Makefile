@@ -25,9 +25,11 @@ selinux_makefile = /usr/share/selinux/devel/Makefile
 %.pp: %.te %.fc %.if
 	make -f $(selinux_makefile) $@
 
+.PHONY: clean-local
 clean-local:
 	rm -rf *~  *.tc *.pp *.pp.bz2 tmp *.cil *.8
 
+.PHONY: test
 test: $(MODULE_NAME).pp
 	# https://access.redhat.com/articles/6999267
 	sudo semodule -i $(MODULE_NAME).pp
@@ -35,5 +37,6 @@ test: $(MODULE_NAME).pp
 %.cil: %.pp
 	cat $(MODULE_NAME).pp | /usr/libexec/selinux/hll/pp > $(MODULE_NAME).cil
 
+.PHONY: man
 man:
 	sepolicy manpage -p . -d $(MODULE_NAME)_t

@@ -180,7 +180,7 @@ fi
 %selinux_relabel_post -s %{selinuxtype}
 
 %files          selinux
-%attr(0600,root,root) %{_datadir}/selinux/packages/%{selinuxtype}/%{modulename}.pp.bz2
+%attr(0644,root,root) %{_datadir}/selinux/packages/%{selinuxtype}/%{modulename}.pp.bz2
 %{_datadir}/selinux/devel/include/contrib/%{modulename}.if
 %ghost %verify(not md5 size mode mtime) %{_sharedstatedir}/selinux/%{selinuxtype}/active/modules/200/%{modulename}
 

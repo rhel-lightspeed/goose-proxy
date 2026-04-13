@@ -28,7 +28,7 @@ selinux_makefile = /usr/share/selinux/devel/Makefile
 clean-local:
 	rm -rf *~  *.tc *.pp *.pp.bz2 tmp *.cil *.8
 
-test:
+test: $(MODULE_NAME).pp
 	# https://access.redhat.com/articles/6999267
 	sudo semodule -i $(MODULE_NAME).pp
 

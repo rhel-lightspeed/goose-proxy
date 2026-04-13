@@ -155,6 +155,7 @@ Requires:       selinux-policy-%{selinuxtype}
 Requires(post): selinux-policy-%{selinuxtype}
 Requires(post): selinux-policy-base >= %{selinux_ver}
 Requires(post): policycoreutils-python-utils
+Requires(postun): selinux-policy-base >= %{selinux_ver}
 Requires(postun): policycoreutils-python-utils
 
 %description    selinux

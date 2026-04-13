@@ -7,27 +7,30 @@ help: ## Show this help message
 
 .PHONY: dev
 dev: ## Run development API
-	uv run fastapi dev src/goose_proxy/app.py
+	uv run --locked fastapi dev src/goose_proxy/app.py
 
 .PHONY: test
 test: ## Run tests
-	uv run pytest
+	uv run --locked pytest
 
 .PHONY: lint
-lint: ## Run linter checks
-	uv run ruff check src/ tests/
+lint: ## Run lint check
+	uv run --locked ruff check src/ tests/
 
-.PHONY: check
-check: ## Run ty checks
-	uv run ty check src
+.PHONY: type
+type: ## Run type check
+	uv run --locked ty check src
 
 .PHONY: format
 format: ## Format code
-	uv run ruff format src/ tests/
+	uv run --locked ruff format src/ tests/
+
+.PHONY: sanity
+sanity: lint check format
 
 .PHONY: man
 man: ## Build man pages with Sphinx
-	uv run sphinx-build -b man docs/man docs/build/man
+	uv run --locked sphinx-build -b man docs/man docs/build/man
 
 .PHONY: clean
 clean: ## Remove build artifacts and caches

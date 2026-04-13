@@ -15,7 +15,7 @@ from pydantic import field_validator
 if sys.version_info >= (3, 11):
     import tomllib
 else:
-    import tomli as tomllib  # ty: ignore[unresolved-import]
+    import tomli as tomllib
 
 
 #: Define the config file path.
@@ -162,8 +162,8 @@ def get_settings() -> Settings:
 
     data = {}
     try:
-        data = config_path.read_text()
-        data = tomllib.loads(data)
+        config = config_path.read_text()
+        data = tomllib.loads(config)
     except FileNotFoundError:
         logger.warning("Config file not found at %s, using defaults.", config_path)
 

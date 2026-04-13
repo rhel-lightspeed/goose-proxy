@@ -47,7 +47,6 @@ RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 RestrictNamespaces=true
 CapabilityBoundingSet=
 NoNewPrivileges=true
-PrivateUsers=true
 RestrictSUIDSGID=true
 LockPersonality=true
 RestrictRealtime=true

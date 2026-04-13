@@ -1,3 +1,13 @@
+# Set selinux_ver depending on RHEL version
+%define selinux_ver 38.1.65
+
+%if 0%{?rhel} && 0%{?rhel} > 10
+%define selinux_ver 42.1.7
+%endif
+
+%define selinuxtype targeted
+%define modulename goose_proxy
+
 Name:           goose-proxy
 Version:        0.1.0
 Release:        %autorelease
@@ -23,12 +33,10 @@ BuildRequires:  python3-pytest-asyncio
 # Sphinx is used to build the manpages for the project.
 BuildRequires:  python3-sphinx
 
-%global _description %{expand:
+
+%description
 A lightweight API translation proxy that bridges Goose with backend servers
-that speak the Responses API from OpenAI, such as Lightspeed Stack.}
-
-%description %_description
-
+that speak the Responses API from OpenAI, such as Lightspeed Stack.
 
 %prep
 %autosetup -p1
@@ -101,6 +109,7 @@ sphinx-build -b man docs/man docs/build/man
 %config(noreplace) %attr(0600, root, root) %{_sysconfdir}/xdg/%{name}/config.toml
 
 # ---------------- Red Hat package
+
 %package    -n goose-redhat
 Summary:    %{summary}
 	
@@ -117,6 +126,68 @@ the communication with RHEL Lightspeed services.
 %{_sysconfdir}/profile.d/goose-init.sh
 %{_datadir}/goose-redhat/config.yaml
 %{_datadir}/goose-redhat/custom_goose-proxy.json
+
+# ---------------- SELinux package
+
+%package        selinux
+Summary:        SELinux policy module for goose-proxy
+BuildArch:      noarch
+
+Requires:       selinux-policy >= %{selinux_ver}
+Requires:       selinux-policy-%{selinuxtype}
+Requires(post): selinux-policy-%{selinuxtype}
+Requires(post): selinux-policy-base >= %{selinux_ver}
+Requires(post): policycoreutils-python-utils
+Requires(postun): policycoreutils-python-utils
+
+%description    selinux
+This package installs and sets up the  SELinux policy security module for %{modulename}.
+
+%prep           selinux
+
+# Build selinux policy
+%{__make} -f data/release/selinux/Makefile %{modulename}.pp.bz2
+
+# Generate a man page of the installed module
+%{__make} -f data/release/selinux/Makefile man
+
+%install        selinux
+install -d %{buildroot}%{_datadir}/selinux/packages
+install -m 644 data/release/selinux/%{modulename}.pp.bz2 %{buildroot}%{_datadir}/selinux/packages/%{selinuxtype}
+
+install -d %{buildroot}%{_datadir}/selinux/devel/include/contrib
+install -m 644 data/release/selinux/%{modulename}.if %{buildroot}%{_datadir}/selinux/devel/include/contrib/
+
+install -d %{buildroot}%{_mandir}/man8/
+install -m 644 data/release/selinux/%{modulename}_selinux.8 %{buildroot}%{_mandir}/man8/%{modulename}_selinux.8
+
+install -d %{buildroot}/etc/selinux/targeted/contexts/users/
+
+
+%pre            selinux
+%selinux_relabel_pre -s %{selinuxtype}
+
+%post           selinux
+%selinux_modules_install -s %{selinuxtype} %{_datadir}/selinux/packages/%{selinuxtype}/%{modulename}.pp.bz2
+# Port 8080 may already be assigned to http_cache_port_t; use -m as fallback.
+semanage port -a -t goose_proxy_port_t -p tcp 8080 2>/dev/null || \
+    semanage port -m -t goose_proxy_port_t -p tcp 8080 2>/dev/null || :
+
+%postun         selinux
+if [ $1 -eq 0 ]; then
+    semanage port -d -t goose_proxy_port_t -p tcp 8080 2>/dev/null || :
+    %selinux_modules_uninstall -s %{selinuxtype} %{modulename}
+fi
+
+%posttrans      selinux
+%selinux_relabel_post -s %{selinuxtype}
+
+%files          selinux
+%attr(0600,root,root) %{_datadir}/selinux/packages/%{selinuxtype}/%{modulename}.pp.bz2
+%{_datadir}/selinux/devel/include/contrib/%{modulename}.if
+%{_mandir}/man8/%{modulename}_selinux.8.*
+%ghost %verify(not md5 size mode mtime) %{_sharedstatedir}/selinux/%{selinuxtype}/active/modules/200/%{modulename}
+
 
 %changelog
 %autochangelog

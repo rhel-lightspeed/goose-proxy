@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 import httpx
 
 from fastapi import FastAPI
+from openai import AsyncOpenAI
 
 from goose_proxy import v1
 from goose_proxy.config import get_settings
@@ -22,15 +23,18 @@ async def lifespan(app: FastAPI):
     cert = (str(backend.auth.cert_file), str(backend.auth.key_file))
 
     http_client = httpx.AsyncClient(
-        base_url=backend.endpoint,
         cert=cert,
         timeout=backend.timeout,
         proxy=backend.proxy or None,
-        headers={"Accept": "application/json"},
     )
-    app.state.http_client = http_client
+    openai_client = AsyncOpenAI(
+        base_url=backend.endpoint,
+        api_key="",
+        http_client=http_client,
+    )
+    app.state.openai_client = openai_client
     yield
-    await http_client.aclose()
+    await openai_client.close()
 
 
 app = FastAPI(

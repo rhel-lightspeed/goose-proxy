@@ -6,14 +6,14 @@ import typing as t
 
 from collections.abc import AsyncIterator
 
-from goose_proxy.models.responses import ResponseCompletedEvent
-from goose_proxy.models.responses import ResponseCreatedEvent
-from goose_proxy.models.responses import ResponseFunctionCallArgumentsDeltaEvent
-from goose_proxy.models.responses import ResponseFunctionToolCall
-from goose_proxy.models.responses import ResponseOutputItemAddedEvent
-from goose_proxy.models.responses import ResponseOutputMessage
-from goose_proxy.models.responses import ResponseTextDeltaEvent
-from goose_proxy.models.responses import StreamEvent
+from openai.types.responses import ResponseCompletedEvent
+from openai.types.responses import ResponseCreatedEvent
+from openai.types.responses import ResponseFunctionCallArgumentsDeltaEvent
+from openai.types.responses import ResponseFunctionToolCall
+from openai.types.responses import ResponseOutputItemAddedEvent
+from openai.types.responses import ResponseOutputMessage
+from openai.types.responses import ResponseStreamEvent
+from openai.types.responses import ResponseTextDeltaEvent
 
 
 def _make_chunk(
@@ -93,7 +93,7 @@ def _translate_usage(event: ResponseCompletedEvent) -> t.Optional[dict[str, int]
 
 
 async def translate_stream(
-    stream: AsyncIterator[StreamEvent],
+    stream: AsyncIterator[ResponseStreamEvent],
     model: t.Optional[str],
 ) -> AsyncIterator[str]:
     """Translate Responses API stream events into Chat Completions SSE lines.

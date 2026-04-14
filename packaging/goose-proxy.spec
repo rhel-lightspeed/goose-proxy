@@ -85,6 +85,7 @@ sphinx-build -b man docs/man docs/build/man
 # System units
 %{__install} -D -m 0644 data/release/systemd/%{name}.service %{buildroot}/%{_unitdir}/%{name}.service
 %{__install} -D -m 0644 data/release/systemd/%{name}.socket %{buildroot}/%{_unitdir}/%{name}.socket
+%{__install} -D -m 0644 data/release/systemd/80-%{name}.preset %{buildroot}/%{_presetdir}/80-%{name}.preset
 
 # Config file
 %{__install} -d -m 0700 %{buildroot}/%{_sysconfdir}/xdg/%{name}
@@ -101,6 +102,8 @@ sphinx-build -b man docs/man docs/build/man
 
 %post
 %systemd_post %{name}.socket
+# Start the socket immediately so the proxy is reachable without a reboot.
+systemctl start %{name}.socket 2>/dev/null || :
 
 %preun
 %systemd_preun %{name}.socket %{name}.service
@@ -127,6 +130,7 @@ sphinx-build -b man docs/man docs/build/man
 # System units
 %{_unitdir}/%{name}.service
 %{_unitdir}/%{name}.socket
+%{_presetdir}/80-%{name}.preset
 
 # Config file
 %config(noreplace) %attr(0600, root, root) %{_sysconfdir}/xdg/%{name}/config.toml

@@ -75,7 +75,7 @@ sphinx-build -b man docs/man docs/build/man
 %{__install} -Dpm 0755 data/release/goose/goose-init.sh %{buildroot}%{_sysconfdir}/profile.d/goose-init.sh 
 	
 # Install the sources into /usr/share/goose-redhat
-%{__install} -Dpm 0644 data/release/goose/config.yml  %{buildroot}%{_datadir}/goose-redhat/config.yml 
+%{__install} -Dpm 0644 data/release/goose/config.yaml  %{buildroot}%{_datadir}/goose-redhat/config.yaml 
 %{__install} -Dpm 0644 data/release/goose/custom_goose-proxy.json %{buildroot}%{_datadir}/goose-redhat/custom_goose-proxy.json 
 
 %check
@@ -115,7 +115,7 @@ the communication with RHEL Lightspeed services.
 
 %files       -n goose-redhat
 %{_sysconfdir}/profile.d/goose-init.sh
-%{_datadir}/goose-redhat/config.yml
+%{_datadir}/goose-redhat/config.yaml
 %{_datadir}/goose-redhat/custom_goose-proxy.json
 
 %changelog

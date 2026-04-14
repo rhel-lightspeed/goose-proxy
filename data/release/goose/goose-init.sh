@@ -3,7 +3,7 @@
 	
 # Red Hat specific customizations
 GOOSE_REDHAT_DIR="/usr/share/goose-redhat"
-GOOSE_REDHAT_CONFIG="${GOOSE_REDHAT_DIR}/config.yml"
+GOOSE_REDHAT_CONFIG="${GOOSE_REDHAT_DIR}/config.yaml"
 GOOSE_REDHAT_PROVIDER="${GOOSE_REDHAT_DIR}/custom_goose-proxy.json"
 	
 # Goose specific folders
@@ -11,7 +11,7 @@ GOOSE_CONFIG_DIR="${HOME}/.config/goose"
 GOOSE_CUSTOM_PROVIDER_DIR="${GOOSE_CONFIG_DIR}/custom_providers"
 	
 # Goose specifc config file and custom provider
-GOOSE_CONFIG_FILE="${GOOSE_CONFIG_DIR}/config.yml"
+GOOSE_CONFIG_FILE="${GOOSE_CONFIG_DIR}/config.yaml"
 GOOSE_CUSTOM_PROVIDER_FILE="${GOOSE_CUSTOM_PROVIDER_DIR}/custom_goose-proxy.json"
 	
 mkdir -p "${GOOSE_CUSTOM_PROVIDER_DIR}"

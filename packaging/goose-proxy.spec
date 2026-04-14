@@ -84,6 +84,7 @@ sphinx-build -b man docs/man docs/build/man
 
 # System units
 %{__install} -D -m 0644 data/release/systemd/%{name}.service %{buildroot}/%{_unitdir}/%{name}.service
+%{__install} -D -m 0644 data/release/systemd/%{name}.socket %{buildroot}/%{_unitdir}/%{name}.socket
 
 # Config file
 %{__install} -d -m 0700 %{buildroot}/%{_sysconfdir}/xdg/%{name}
@@ -97,6 +98,16 @@ sphinx-build -b man docs/man docs/build/man
 # Install the sources into /usr/share/goose-redhat
 %{__install} -Dpm 0644 data/release/goose/config.yaml  %{buildroot}%{_datadir}/goose-redhat/config.yaml
 %{__install} -Dpm 0644 data/release/goose/custom_goose-proxy.json %{buildroot}%{_datadir}/goose-redhat/custom_goose-proxy.json
+
+%post
+%systemd_post %{name}.socket
+
+%preun
+%systemd_preun %{name}.socket %{name}.service
+
+%postun
+%systemd_postun_with_restart %{name}.socket %{name}.service
+
 
 %files
 %license LICENSE
@@ -115,6 +126,7 @@ sphinx-build -b man docs/man docs/build/man
 
 # System units
 %{_unitdir}/%{name}.service
+%{_unitdir}/%{name}.socket
 
 # Config file
 %config(noreplace) %attr(0600, root, root) %{_sysconfdir}/xdg/%{name}/config.toml

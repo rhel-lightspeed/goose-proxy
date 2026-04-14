@@ -4,7 +4,6 @@ import json
 
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
-from unittest.mock import patch
 
 import httpx
 import pytest
@@ -74,19 +73,16 @@ def _make_tool_call_response():
 
 
 @pytest.fixture
-def test_client():
+def test_client(monkeypatch):
     """FastAPI test client with mocked config."""
     mock_settings = MagicMock(spec=Settings)
     mock_settings.backend = MagicMock(spec=Backend)
     mock_settings.backend.timeout = 30
 
-    original_client = getattr(app.state, "http_client", None)
-    app.state.http_client = MagicMock()
+    monkeypatch.setattr("goose_proxy.middleware.get_settings", lambda: mock_settings)
+    monkeypatch.setattr(app.state, "http_client", MagicMock(), raising=False)
 
-    with patch("goose_proxy.middleware.get_settings", return_value=mock_settings):
-        yield TestClient(app, raise_server_exceptions=False)
-
-    app.state.http_client = original_client
+    return TestClient(app, raise_server_exceptions=False)
 
 
 @pytest.fixture
@@ -103,48 +99,46 @@ def tool_call_response_fixture():
 
 
 class TestChatCompletions:
-    def test_chat_completions_success(self, test_client, text_response_fixture):
-        with patch(
+    def test_chat_completions_success(self, test_client, text_response_fixture, monkeypatch):
+        monkeypatch.setattr(
             "goose_proxy.v1.create_response",
-            new_callable=AsyncMock,
-            return_value=text_response_fixture,
-        ):
-            resp = test_client.post(
-                "/v1/chat/completions",
-                json={
-                    "model": "rhel-lightspeed/vertex",
-                    "messages": [{"role": "user", "content": "Hello"}],
-                },
-            )
+            AsyncMock(return_value=text_response_fixture),
+        )
+        resp = test_client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "rhel-lightspeed/vertex",
+                "messages": [{"role": "user", "content": "Hello"}],
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["object"] == "chat.completion"
         assert data["choices"][0]["message"]["content"] == "Hello!"
         assert data["choices"][0]["finish_reason"] == "stop"
 
-    def test_chat_completions_with_tools(self, test_client, tool_call_response_fixture):
-        with patch(
+    def test_chat_completions_with_tools(self, test_client, tool_call_response_fixture, monkeypatch):
+        monkeypatch.setattr(
             "goose_proxy.v1.create_response",
-            new_callable=AsyncMock,
-            return_value=tool_call_response_fixture,
-        ):
-            resp = test_client.post(
-                "/v1/chat/completions",
-                json={
-                    "model": "rhel-lightspeed/vertex",
-                    "messages": [{"role": "user", "content": "Weather?"}],
-                    "tools": [
-                        {
-                            "type": "function",
-                            "function": {
-                                "name": "get_weather",
-                                "description": "Get weather",
-                                "parameters": {"type": "object", "properties": {}},
-                            },
-                        }
-                    ],
-                },
-            )
+            AsyncMock(return_value=tool_call_response_fixture),
+        )
+        resp = test_client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "rhel-lightspeed/vertex",
+                "messages": [{"role": "user", "content": "Weather?"}],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "get_weather",
+                            "description": "Get weather",
+                            "parameters": {"type": "object", "properties": {}},
+                        },
+                    }
+                ],
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["choices"][0]["finish_reason"] == "tool_calls"
@@ -152,7 +146,7 @@ class TestChatCompletions:
         assert len(tc) == 1
         assert tc[0]["function"]["name"] == "get_weather"
 
-    def test_chat_completions_streaming(self, test_client, text_response_fixture):
+    def test_chat_completions_streaming(self, test_client, monkeypatch):
         base_resp = Response(
             id="resp_stream",
             created_at=1700000000,
@@ -200,15 +194,15 @@ class TestChatCompletions:
             for e in events:
                 yield e
 
-        with patch("goose_proxy.v1.stream_response", side_effect=mock_stream):
-            resp = test_client.post(
-                "/v1/chat/completions",
-                json={
-                    "model": "rhel-lightspeed/vertex",
-                    "messages": [{"role": "user", "content": "Hello"}],
-                    "stream": True,
-                },
-            )
+        monkeypatch.setattr("goose_proxy.v1.stream_response", mock_stream)
+        resp = test_client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "rhel-lightspeed/vertex",
+                "messages": [{"role": "user", "content": "Hello"}],
+                "stream": True,
+            },
+        )
         assert resp.status_code == 200
         assert "text/event-stream" in resp.headers["content-type"]
 
@@ -220,29 +214,29 @@ class TestChatCompletions:
         first = json.loads(lines[0].removeprefix("data: "))
         assert first["choices"][0]["delta"]["role"] == "assistant"
 
-    def test_chat_completions_backend_error(self, test_client):
+    def test_chat_completions_backend_error(self, test_client, monkeypatch):
         error_response = httpx.Response(
             status_code=404,
             json={"error": {"message": "Model not found"}},
         )
         error_response._request = httpx.Request("POST", "http://test")
 
-        with patch(
+        error = httpx.HTTPStatusError(
+            message="Not Found",
+            request=httpx.Request("POST", "http://test"),
+            response=error_response,
+        )
+        monkeypatch.setattr(
             "goose_proxy.v1.create_response",
-            new_callable=AsyncMock,
-            side_effect=httpx.HTTPStatusError(
-                message="Not Found",
-                request=httpx.Request("POST", "http://test"),
-                response=error_response,
-            ),
-        ):
-            resp = test_client.post(
-                "/v1/chat/completions",
-                json={
-                    "model": "nonexistent/model",
-                    "messages": [{"role": "user", "content": "Hi"}],
-                },
-            )
+            AsyncMock(side_effect=error),
+        )
+        resp = test_client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "nonexistent/model",
+                "messages": [{"role": "user", "content": "Hi"}],
+            },
+        )
         assert resp.status_code == 404
         data = resp.json()
         assert data["error"]["message"] == "Model not found"

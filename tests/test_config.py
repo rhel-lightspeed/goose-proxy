@@ -3,7 +3,6 @@
 import os
 
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -36,30 +35,28 @@ class TestLogging:
 
 
 class TestResolveCredential:
-    def test_falls_back_when_env_unset(self):
-        with patch.dict(os.environ, {}, clear=True):
-            os.environ.pop("CREDENTIALS_DIRECTORY", None)
-            result = _resolve_credential("cert.pem", "/etc/pki/consumer/cert.pem")
+    def test_falls_back_when_env_unset(self, monkeypatch):
+        monkeypatch.delenv("CREDENTIALS_DIRECTORY", raising=False)
+        result = _resolve_credential("cert.pem", "/etc/pki/consumer/cert.pem")
         assert result == Path("/etc/pki/consumer/cert.pem")
 
-    def test_falls_back_when_credential_file_missing(self, tmp_path):
-        with patch.dict(os.environ, {"CREDENTIALS_DIRECTORY": str(tmp_path)}):
-            result = _resolve_credential("cert.pem", "/etc/pki/consumer/cert.pem")
+    def test_falls_back_when_credential_file_missing(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("CREDENTIALS_DIRECTORY", str(tmp_path))
+        result = _resolve_credential("cert.pem", "/etc/pki/consumer/cert.pem")
         assert result == Path("/etc/pki/consumer/cert.pem")
 
-    def test_resolves_from_credentials_directory(self, tmp_path):
+    def test_resolves_from_credentials_directory(self, tmp_path, monkeypatch):
         cred_file = tmp_path / "cert.pem"
         cred_file.write_text("fake cert")
-        with patch.dict(os.environ, {"CREDENTIALS_DIRECTORY": str(tmp_path)}):
-            result = _resolve_credential("cert.pem", "/etc/pki/consumer/cert.pem")
+        monkeypatch.setenv("CREDENTIALS_DIRECTORY", str(tmp_path))
+        result = _resolve_credential("cert.pem", "/etc/pki/consumer/cert.pem")
         assert result == cred_file
 
 
 class TestAuth:
-    def test_default_cert_paths(self):
-        with patch.dict(os.environ, {}, clear=True):
-            os.environ.pop("CREDENTIALS_DIRECTORY", None)
-            auth = Auth()
+    def test_default_cert_paths(self, monkeypatch):
+        monkeypatch.delenv("CREDENTIALS_DIRECTORY", raising=False)
+        auth = Auth()
         assert auth.cert_file == Path("/etc/pki/consumer/cert.pem")
         assert auth.key_file == Path("/etc/pki/consumer/key.pem")
 
@@ -68,11 +65,11 @@ class TestAuth:
         assert auth.cert_file == Path("/tmp/cert.pem")
         assert auth.key_file == Path("/tmp/key.pem")
 
-    def test_defaults_resolve_from_credentials_directory(self, tmp_path):
+    def test_defaults_resolve_from_credentials_directory(self, tmp_path, monkeypatch):
         (tmp_path / "cert.pem").write_text("fake cert")
         (tmp_path / "key.pem").write_text("fake key")
-        with patch.dict(os.environ, {"CREDENTIALS_DIRECTORY": str(tmp_path)}):
-            auth = Auth()
+        monkeypatch.setenv("CREDENTIALS_DIRECTORY", str(tmp_path))
+        auth = Auth()
         assert auth.cert_file == tmp_path / "cert.pem"
         assert auth.key_file == tmp_path / "key.pem"
 
@@ -109,34 +106,32 @@ class TestServer:
 
 
 class TestGetXdgConfigPath:
-    def test_returns_etc_xdg_when_env_unset(self):
-        with patch.dict(os.environ, {}, clear=True):
-            # Remove XDG_CONFIG_DIRS if present
-            os.environ.pop("XDG_CONFIG_DIRS", None)
-            result = get_xdg_config_path()
+    def test_returns_etc_xdg_when_env_unset(self, monkeypatch):
+        monkeypatch.delenv("XDG_CONFIG_DIRS", raising=False)
+        result = get_xdg_config_path()
         assert result == Path("/etc/xdg")
 
-    def test_returns_single_path_directly(self, tmp_path):
-        with patch.dict(os.environ, {"XDG_CONFIG_DIRS": str(tmp_path)}):
-            result = get_xdg_config_path()
+    def test_returns_single_path_directly(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("XDG_CONFIG_DIRS", str(tmp_path))
+        result = get_xdg_config_path()
         assert result == tmp_path
 
-    def test_returns_first_existing_path_from_multiple(self, tmp_path):
+    def test_returns_first_existing_path_from_multiple(self, tmp_path, monkeypatch):
         existing = tmp_path / "existing"
         existing.mkdir()
         nonexistent = tmp_path / "nonexistent"
         paths = f"{nonexistent}{os.pathsep}{existing}"
-        with patch.dict(os.environ, {"XDG_CONFIG_DIRS": paths}):
-            result = get_xdg_config_path()
+        monkeypatch.setenv("XDG_CONFIG_DIRS", paths)
+        result = get_xdg_config_path()
         assert result == existing
 
-    def test_returns_etc_xdg_when_no_paths_exist(self, tmp_path):
+    def test_returns_etc_xdg_when_no_paths_exist(self, tmp_path, monkeypatch):
         paths = f"{tmp_path}/a{os.pathsep}{tmp_path}/b"
-        with patch.dict(os.environ, {"XDG_CONFIG_DIRS": paths}):
-            result = get_xdg_config_path()
+        monkeypatch.setenv("XDG_CONFIG_DIRS", paths)
+        result = get_xdg_config_path()
         assert result == Path("/etc/xdg")
 
-    def test_empty_env_var_returns_default(self):
-        with patch.dict(os.environ, {"XDG_CONFIG_DIRS": ""}):
-            result = get_xdg_config_path()
+    def test_empty_env_var_returns_default(self, monkeypatch):
+        monkeypatch.setenv("XDG_CONFIG_DIRS", "")
+        result = get_xdg_config_path()
         assert result == Path("/etc/xdg")

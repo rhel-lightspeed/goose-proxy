@@ -1,10 +1,10 @@
 """Tests for the timeout middleware."""
 
 import asyncio
-import typing as t
 
 from unittest.mock import MagicMock
-from unittest.mock import patch
+
+import pytest
 
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
@@ -15,38 +15,37 @@ from starlette.testclient import TestClient
 from goose_proxy.middleware import TimeoutMiddleware
 
 
-def _make_app(handler, timeout: t.Union[int, float] = 5):
-    """Create a minimal Starlette app with TimeoutMiddleware."""
-    app = Starlette(routes=[Route("/", handler)])
-    mock_settings = MagicMock()
-    mock_settings.backend.timeout = timeout
+@pytest.fixture
+def make_app(monkeypatch):
+    """Factory fixture that creates a Starlette app wrapped in TimeoutMiddleware."""
 
-    wrapped = TimeoutMiddleware(app)
-    # Patch get_settings for the middleware
-    return wrapped, mock_settings
+    def _make(handler, timeout=5):
+        app = Starlette(routes=[Route("/", handler)])
+        mock_settings = MagicMock()
+        mock_settings.backend.timeout = timeout
+        monkeypatch.setattr("goose_proxy.middleware.get_settings", lambda: mock_settings)
+        return TimeoutMiddleware(app)
+
+    return _make
 
 
 class TestTimeoutMiddleware:
-    def test_successful_request_passes_through(self):
+    def test_successful_request_passes_through(self, make_app):
         async def handler(request):
             return PlainTextResponse("OK")
 
-        wrapped, mock_settings = _make_app(handler, timeout=5)
-        with patch("goose_proxy.middleware.get_settings", return_value=mock_settings):
-            client = TestClient(wrapped)
-            resp = client.get("/")
+        client = TestClient(make_app(handler, timeout=5))
+        resp = client.get("/")
         assert resp.status_code == 200
         assert resp.text == "OK"
 
-    def test_slow_response_returns_504(self):
+    def test_slow_response_returns_504(self, make_app):
         async def handler(request):
             await asyncio.sleep(10)
             return PlainTextResponse("Too late")
 
-        wrapped, mock_settings = _make_app(handler, timeout=0.1)
-        with patch("goose_proxy.middleware.get_settings", return_value=mock_settings):
-            client = TestClient(wrapped)
-            resp = client.get("/")
+        client = TestClient(make_app(handler, timeout=0.1))
+        resp = client.get("/")
         assert resp.status_code == 504
         body = resp.json()
         assert body["error"]["type"] == "server_error"
@@ -65,7 +64,7 @@ class TestTimeoutMiddleware:
         await middleware(scope, None, None)
         assert call_log == ["websocket"]
 
-    def test_streaming_response_not_cut_short(self):
+    def test_streaming_response_not_cut_short(self, make_app):
         """Once headers are sent, the middleware should not enforce a timeout."""
 
         async def handler(request):
@@ -76,21 +75,16 @@ class TestTimeoutMiddleware:
 
             return StreamingResponse(generate(), media_type="text/plain")
 
-        wrapped, mock_settings = _make_app(handler, timeout=0.1)
-        with patch("goose_proxy.middleware.get_settings", return_value=mock_settings):
-            client = TestClient(wrapped)
-            resp = client.get("/")
-        # The response should complete successfully since headers were sent quickly
+        client = TestClient(make_app(handler, timeout=0.1))
+        resp = client.get("/")
         assert resp.status_code == 200
         assert "chunk1" in resp.text
         assert "chunk2" in resp.text
 
-    def test_app_error_propagates(self):
+    def test_app_error_propagates(self, make_app):
         async def handler(request):
             raise ValueError("Something went wrong")
 
-        wrapped, mock_settings = _make_app(handler, timeout=5)
-        with patch("goose_proxy.middleware.get_settings", return_value=mock_settings):
-            client = TestClient(wrapped, raise_server_exceptions=False)
-            resp = client.get("/")
+        client = TestClient(make_app(handler, timeout=5), raise_server_exceptions=False)
+        resp = client.get("/")
         assert resp.status_code == 500

@@ -1,14 +1,17 @@
 import json
 import logging
+import typing as t
 
 from collections.abc import AsyncIterator
 
 import httpx
 
 from fastapi import APIRouter
+from fastapi import Depends
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 
+from goose_proxy.config import get_settings
 from goose_proxy.models.chat import ChatCompletionRequest
 from goose_proxy.models.chat import ModelInfo
 from goose_proxy.models.chat import ModelsResponse
@@ -21,8 +24,28 @@ from goose_proxy.translators import translate_stream
 
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level="DEBUG")
 
 router = APIRouter(prefix="/v1")
+
+
+async def get_http_client():
+    logger.debug("Getting HTTP Client")
+    settings = get_settings()
+    backend = settings.backend
+    cert = (str(backend.auth.cert_file), str(backend.auth.key_file))
+
+    http_client = httpx.AsyncClient(
+        base_url=backend.endpoint,
+        cert=cert,
+        timeout=backend.timeout,
+        proxy=backend.proxy or None,
+        headers={"Accept": "application/json"},
+    )
+
+    yield http_client
+
+    await http_client.aclose()
 
 
 async def create_response(client: httpx.AsyncClient, **params) -> Response:
@@ -62,8 +85,10 @@ async def stream_response(client: httpx.AsyncClient, **params) -> AsyncIterator[
 
 
 @router.post("/chat/completions", response_model_exclude_none=True)
-async def chat_completions(request: Request, data: ChatCompletionRequest):
-    client: httpx.AsyncClient = request.app.state.http_client
+async def chat_completions(
+    data: ChatCompletionRequest,
+    client: t.Annotated[httpx.AsyncClient, Depends(get_http_client)],
+):
     params = translate_request(data)
     if data.stream:
         stream = stream_response(client, **params)

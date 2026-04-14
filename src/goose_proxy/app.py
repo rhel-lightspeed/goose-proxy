@@ -1,36 +1,13 @@
 import logging
 
-from contextlib import asynccontextmanager
-
-import httpx
-
 from fastapi import FastAPI
 
 from goose_proxy import v1
-from goose_proxy.config import get_settings
 from goose_proxy.exceptions import register_exception_handlers
 from goose_proxy.middleware import TimeoutMiddleware
 
 
 logger = logging.getLogger(__name__)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    settings = get_settings()
-    backend = settings.backend
-    cert = (str(backend.auth.cert_file), str(backend.auth.key_file))
-
-    http_client = httpx.AsyncClient(
-        base_url=backend.endpoint,
-        cert=cert,
-        timeout=backend.timeout,
-        proxy=backend.proxy or None,
-        headers={"Accept": "application/json"},
-    )
-    app.state.http_client = http_client
-    yield
-    await http_client.aclose()
 
 
 app = FastAPI(
@@ -45,7 +22,6 @@ app = FastAPI(
     root_path="/",
     docs_url=None,
     redoc_url=None,
-    lifespan=lifespan,
 )
 
 app.add_middleware(TimeoutMiddleware)

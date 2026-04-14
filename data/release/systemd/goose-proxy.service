@@ -1,8 +1,7 @@
 [Unit]
 Description=Goose Proxy Daemon Service
 Documentation=man:goose-proxy(7)
-After=network-online.target
-Wants=network-online.target
+Requires=goose-proxy.socket
 
 [Service]
 Type=simple
@@ -53,6 +52,3 @@ MemoryDenyWriteExecute=true
 
 # Resource limits
 LimitNOFILE=4096
-
-[Install]
-WantedBy=multi-user.target

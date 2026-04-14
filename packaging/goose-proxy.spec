@@ -64,6 +64,7 @@ sphinx-build -b man docs/man docs/build/man
 
 # System units
 %{__install} -D -m 0644 data/release/systemd/%{name}.service %{buildroot}/%{_unitdir}/%{name}.service
+%{__install} -D -m 0644 data/release/systemd/%{name}.socket %{buildroot}/%{_unitdir}/%{name}.socket
 
 # Config file
 %{__install} -d -m 0700 %{buildroot}/%{_sysconfdir}/xdg/%{name}
@@ -82,6 +83,16 @@ sphinx-build -b man docs/man docs/build/man
 %pytest
 
 
+%post
+%systemd_post %{name}.socket
+
+%preun
+%systemd_preun %{name}.socket %{name}.service
+
+%postun
+%systemd_postun_with_restart %{name}.socket %{name}.service
+
+
 %files -f %{pyproject_files}
 
 %{_bindir}/goose-proxy
@@ -96,6 +107,7 @@ sphinx-build -b man docs/man docs/build/man
 
 # System units
 %{_unitdir}/%{name}.service
+%{_unitdir}/%{name}.socket
 
 # Config file
 %config(noreplace) %attr(0600, root, root) %{_sysconfdir}/xdg/%{name}/config.toml

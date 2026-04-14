@@ -28,7 +28,7 @@ uv run goose-proxy
 ### Non-Streaming Request
 
 ```bash
-curl -s http://127.0.0.1:8080/v1/chat/completions \
+curl -s http://127.0.0.1:7080/v1/chat/completions \
      -H "Content-Type: application/json" \
      -d '{
        "model": "rhel-lightspeed/goose",
@@ -39,7 +39,7 @@ curl -s http://127.0.0.1:8080/v1/chat/completions \
 ### Streaming Request
 
 ```bash
-curl -N http://127.0.0.1:8080/v1/chat/completions \
+curl -N http://127.0.0.1:7080/v1/chat/completions \
      -H "Content-Type: application/json" \
      -d '{
        "model": "rhel-lightspeed/goose",
@@ -53,13 +53,13 @@ Each SSE chunk appears as `data: {...}` followed by `data: [DONE]` at the end.
 ### Models
 
 ```bash
-curl -s http://127.0.0.1:8080/v1/models | python3 -m json.tool
+curl -s http://127.0.0.1:7080/v1/models | python3 -m json.tool
 ```
 
 ### Health Check
 
 ```bash
-curl -s http://127.0.0.1:8080/health
+curl -s http://127.0.0.1:7080/health
 ```
 
 ## Running Tests

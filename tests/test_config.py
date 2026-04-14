@@ -80,7 +80,7 @@ class TestAuth:
 class TestBackend:
     def test_defaults(self):
         b = Backend()
-        assert b.endpoint == "https://0.0.0.0:8080"
+        assert b.endpoint == "https://cert.console.redhat.com/api/lightspeed/v1"
         assert b.proxy == ""
         assert b.timeout == 30
         assert isinstance(b.auth, Auth)
@@ -96,7 +96,7 @@ class TestServer:
     def test_defaults(self):
         s = Server()
         assert s.host == "127.0.0.1"
-        assert s.port == 8080
+        assert s.port == 7080
         assert s.reload is False
         assert s.workers == 1
 

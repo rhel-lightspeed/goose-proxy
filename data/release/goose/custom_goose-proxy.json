@@ -4,7 +4,7 @@
     "display_name": "RHEL command line assistant",
     "description": "Custom goose-proxy provider for RHEL command line assistant",
     "api_key_env": "",
-    "base_url": "http://127.0.0.1:8080",
+    "base_url": "http://127.0.0.1:7080",
     "base_path": "v1/chat/completions",
     "models": [
         {

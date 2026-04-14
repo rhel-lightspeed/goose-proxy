@@ -130,7 +130,7 @@ class Backend(BaseModel):
         timeout (int): HTTP request timeout in seconds
     """
 
-    endpoint: str = "https://0.0.0.0:8080"
+    endpoint: str = "https://cert.console.redhat.com/api/lightspeed/v1"
     auth: Auth = Field(default_factory=Auth)
     proxy: str = ""
     timeout: int = 30
@@ -140,7 +140,7 @@ class Server(BaseModel):
     """These are the settings that control how uvicon runs the application"""
 
     host: str = "127.0.0.1"
-    port: int = 8080
+    port: int = 7080
     reload: bool = False
     workers: int = 1
 

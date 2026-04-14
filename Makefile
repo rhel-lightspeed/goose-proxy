@@ -26,7 +26,7 @@ format: ## Format code
 	uv run --locked ruff format src/ tests/
 
 .PHONY: sanity
-sanity: lint check format
+sanity: lint type format
 
 .PHONY: man
 man: ## Build man pages with Sphinx

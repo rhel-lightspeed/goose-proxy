@@ -80,8 +80,9 @@ def override_client(test_client):
     def override_get_http_client():
         return httpx.AsyncClient()
 
-    test_client.app.dependency_overrides = {}
     test_client.app.dependency_overrides[get_http_client] = override_get_http_client
+    yield
+    test_client.app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -98,11 +99,10 @@ def tool_call_response_fixture():
 
 
 class TestChatCompletions:
-    def test_chat_completions_success(self, test_client, override_client, text_response_fixture, mocker):
-        mocker.patch(
+    def test_chat_completions_success(self, test_client, override_client, text_response_fixture, monkeypatch):
+        monkeypatch.setattr(
             "goose_proxy.v1.create_response",
-            new_callable=AsyncMock,
-            return_value=text_response_fixture,
+            AsyncMock(return_value=text_response_fixture),
         )
 
         resp = test_client.post(
@@ -119,11 +119,10 @@ class TestChatCompletions:
         assert data["choices"][0]["message"]["content"] == "Hello!"
         assert data["choices"][0]["finish_reason"] == "stop"
 
-    def test_chat_completions_with_tools(self, test_client, override_client, tool_call_response_fixture, mocker):
-        mocker.patch(
+    def test_chat_completions_with_tools(self, test_client, override_client, tool_call_response_fixture, monkeypatch):
+        monkeypatch.setattr(
             "goose_proxy.v1.create_response",
-            new_callable=AsyncMock,
-            return_value=tool_call_response_fixture,
+            AsyncMock(return_value=tool_call_response_fixture),
         )
 
         resp = test_client.post(
@@ -151,7 +150,7 @@ class TestChatCompletions:
         assert len(tc) == 1
         assert tc[0]["function"]["name"] == "get_weather"
 
-    def test_chat_completions_streaming(self, test_client, text_response_fixture, mocker):
+    def test_chat_completions_streaming(self, test_client, override_client, text_response_fixture, monkeypatch):
         base_resp = Response(
             id="resp_stream",
             created_at=1700000000,
@@ -199,7 +198,7 @@ class TestChatCompletions:
             for e in events:
                 yield e
 
-        mocker.patch("goose_proxy.v1.stream_response", side_effect=mock_stream)
+        monkeypatch.setattr("goose_proxy.v1.stream_response", mock_stream)
         resp = test_client.post(
             "/v1/chat/completions",
             json={
@@ -219,20 +218,21 @@ class TestChatCompletions:
         first = json.loads(lines[0].removeprefix("data: "))
         assert first["choices"][0]["delta"]["role"] == "assistant"
 
-    def test_chat_completions_backend_error(self, test_client, mocker):
+    def test_chat_completions_backend_error(self, test_client, override_client, monkeypatch):
         error_response = httpx.Response(
             status_code=404,
             json={"error": {"message": "Model not found"}},
         )
         error_response._request = httpx.Request("POST", "http://test")
 
-        mocker.patch(
+        monkeypatch.setattr(
             "goose_proxy.v1.create_response",
-            new_callable=AsyncMock,
-            side_effect=httpx.HTTPStatusError(
-                message="Not Found",
-                request=httpx.Request("POST", "http://test"),
-                response=error_response,
+            AsyncMock(
+                side_effect=httpx.HTTPStatusError(
+                    message="Not Found",
+                    request=httpx.Request("POST", "http://test"),
+                    response=error_response,
+                ),
             ),
         )
         resp = test_client.post(
@@ -247,7 +247,7 @@ class TestChatCompletions:
         assert resp.status_code == 404
         assert data["error"]["message"] == "Model not found"
 
-    def test_chat_completions_invalid_request(self, test_client):
+    def test_chat_completions_invalid_request(self, test_client, override_client):
         resp = test_client.post(
             "/v1/chat/completions",
             json={"messages": [{"role": "user", "content": "Hi"}]},

@@ -24,7 +24,6 @@ from goose_proxy.translators import translate_stream
 
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level="DEBUG")
 
 router = APIRouter(prefix="/v1")
 

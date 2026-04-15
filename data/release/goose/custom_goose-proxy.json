@@ -16,9 +16,7 @@
             "supports_cache_control": null
         }
     ],
-    "headers": {
-        "X-LCS-Merge-Server-Tools": "true"
-    },
+    "headers": {},
     "timeout_seconds": null,
     "supports_streaming": true,
     "requires_auth": true

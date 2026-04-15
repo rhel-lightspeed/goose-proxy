@@ -39,7 +39,10 @@ async def get_http_client():
         cert=cert,
         timeout=backend.timeout,
         proxy=backend.proxy or None,
-        headers={"Accept": "application/json"},
+        headers={
+            "Accept": "application/json",
+            "X-LCS-Merge-Server-Tools": "true",
+        },
     )
 
     yield http_client

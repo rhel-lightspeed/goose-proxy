@@ -57,9 +57,9 @@ class TestBackend:
         assert isinstance(b.auth, Auth)
 
     def test_custom_values(self):
-        b = Backend(endpoint="https://example.com", proxy="http://proxy:8080", timeout=60)
+        b = Backend(endpoint="https://example.com", proxy="http://proxy:7080", timeout=60)
         assert b.endpoint == "https://example.com"
-        assert b.proxy == "http://proxy:8080"
+        assert b.proxy == "http://proxy:7080"
         assert b.timeout == 60
 
 

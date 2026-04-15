@@ -76,7 +76,7 @@ SOCKET ACTIVATION
 =================
 
 When installed as a system package, **goose-proxy** is socket-activated by
-systemd. The ``goose-proxy.socket`` unit listens on ``127.0.0.1:8080`` and
+systemd. The ``goose-proxy.socket`` unit listens on ``127.0.0.1:7080`` and
 starts the service on demand when a client connects.
 
 To enable the socket::

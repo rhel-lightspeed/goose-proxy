@@ -9,17 +9,9 @@ Type=simple
 RemainAfterExit=no
 ExecStart=/usr/bin/goose-proxy
 
-# Run as an ephemeral unprivileged user
-DynamicUser=true
-
 # Filesystem: read-only except /dev, /proc, /sys
 ProtectHome=true
 ProtectSystem=strict
-
-# Load RHSM certificates via systemd credentials so the DynamicUser can
-# access files that are owned by root in /etc/pki/consumer.
-LoadCredential=cert.pem:/etc/pki/consumer/cert.pem
-LoadCredential=key.pem:/etc/pki/consumer/key.pem
 
 # Private /tmp so the service can't snoop on other processes
 PrivateTmp=true
@@ -47,7 +39,6 @@ RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 RestrictNamespaces=true
 CapabilityBoundingSet=
 NoNewPrivileges=true
-PrivateUsers=true
 RestrictSUIDSGID=true
 LockPersonality=true
 RestrictRealtime=true

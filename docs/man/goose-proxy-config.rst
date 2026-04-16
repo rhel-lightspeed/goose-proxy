@@ -30,6 +30,12 @@ SECTIONS
 
 Settings that control the HTTP server (uvicorn).
 
+.. note::
+
+   Under systemd socket activation, the ``host`` and ``port`` settings are
+   ignored. The listening address is controlled by the ``goose-proxy.socket``
+   unit file instead.
+
 ``host`` = *string*
     The address to bind the server to.
     **Default:** ``"127.0.0.1"``

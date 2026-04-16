@@ -72,6 +72,21 @@ Base Directory Specification. The default path is
 ``/etc/xdg/goose-proxy/config.toml``. See **goose-proxy-config**\(5) for a
 complete reference of all configuration options.
 
+SOCKET ACTIVATION
+=================
+
+When installed as a system package, **goose-proxy** is socket-activated by
+systemd. The ``goose-proxy.socket`` unit listens on ``127.0.0.1:7080`` and
+starts the service on demand when a client connects.
+
+To enable the socket::
+
+    systemctl enable --now goose-proxy.socket
+
+The service detects socket activation automatically via the ``LISTEN_FDS``
+environment variable and uses the passed file descriptor instead of binding
+to the configured host and port.
+
 SEE ALSO
 ========
 

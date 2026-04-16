@@ -1,0 +1,10 @@
+[Unit]
+Description=Goose Proxy Socket
+Documentation=man:goose-proxy(7)
+
+[Socket]
+ListenStream=127.0.0.1:7080
+NoDelay=true
+
+[Install]
+WantedBy=sockets.target

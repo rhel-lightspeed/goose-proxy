@@ -120,6 +120,17 @@ class TestGetSettings:
         assert settings.backend.timeout == 99
         assert settings.logging.level == "DEBUG"
 
+    def test_error_on_invalid_config_file(self, monkeypatch, tmp_path):
+        config_dir = tmp_path / "goose-proxy"
+        config_dir.mkdir()
+        config_file = config_dir / "config.toml"
+        config_file.write_text('[backend]\ntimeout = 99\ntimeout = 30\n\n[logging]\nlevel = "DEBUG"\n')
+
+        monkeypatch.setattr("os.environ", {"XDG_CONFIG_DIRS": str(tmp_path)})
+
+        with pytest.raises(SystemExit, match="Problem reading config file"):
+            get_settings()
+
 
 class TestGetXdgConfigPath:
     def test_returns_etc_xdg_when_env_unset(self):

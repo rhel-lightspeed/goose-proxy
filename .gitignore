@@ -10,5 +10,9 @@ wheels/
 # Sphinx build output
 docs/build/
 
+# Vendored packages
+src/goose_proxy/_vendor/*
+!src/goose_proxy/_vendor/__init__.py
+
 # Virtual environments
 .venv

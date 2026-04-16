@@ -14,7 +14,7 @@ dependencies = [
     "fastapi[standard-no-fastapi-cloud-cli]>=0.121.2",
     "uvicorn>=0.38.0",
 ]
-# Python 3.9 is the minimum version available in RHEL 9, our lowest target. 
+# Python 3.9 is the minimum version available in RHEL 9, our lowest target.
 requires-python = ">=3.9"
 license-files = ["LICENSE"]
 dynamic = ["version"]
@@ -79,9 +79,11 @@ data_file = "coverage/.data"
 source = [
     "src",
     "tests",
+    "src/goose_proxy/_vendor/__init__.py",
 ]
 omit = [
-    ".venv/*"  # VS Code is including these files in reports for an unknown reason
+    "src/goose_proxy/_vendor/*/*",
+    ".venv/*",  # VS Code is including these files in reports for an unknown reason
 ]
 
 [tool.coverage.html]
@@ -97,6 +99,10 @@ output = "coverage/coverage.xml"
 line-length = 120
 indent-width = 4
 target-version = "py39"
+extend-exclude = [
+    "src/goose_proxy/_vendor/[!_]*",  # Exclude everything that doesn't start with _
+    "src/goose_proxy/_vendor/_[!_]*", # Exclude item starting with a singe _
+]
 
 [tool.ruff.lint]
 # https://docs.astral.sh/ruff/rules/
@@ -120,6 +126,12 @@ force-single-line = true
 lines-after-imports = 2
 lines-between-types = 1
 order-by-type = false
+
+[tool.ty.src]
+exclude = [
+    "src/goose_proxy/_vendor/*/",
+    "src/goose_proxy/_vendor/typing_extensions.py",
+]
 
 [tool.ty.environment]
 python-version = "3.9"

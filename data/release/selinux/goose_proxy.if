@@ -1,0 +1,97 @@
+## <summary>Policy for goose_proxy</summary>
+
+########################################
+## <summary>
+##	Execute goose_proxy_exec_t in the goose_proxy domain.
+## </summary>
+## <param name="domain">
+##	<summary>
+##	Domain allowed to transition.
+##	</summary>
+## </param>
+#
+interface(`goose_proxy_domtrans',`
+	gen_require(`
+		type goose_proxy_t, goose_proxy_exec_t;
+	')
+
+	corecmd_search_bin($1)
+	domtrans_pattern($1, goose_proxy_exec_t, goose_proxy_t)
+')
+
+######################################
+## <summary>
+##	Execute goose_proxy in the caller domain.
+## </summary>
+## <param name="domain">
+##	<summary>
+##	Domain allowed access.
+##	</summary>
+## </param>
+#
+interface(`goose_proxy_exec',`
+	gen_require(`
+		type goose_proxy_exec_t;
+	')
+
+	corecmd_search_bin($1)
+	can_exec($1, goose_proxy_exec_t)
+')
+
+######################################
+## <summary>
+##	Connect to goose-proxy over TCP.
+## </summary>
+## <desc>
+##	<p>
+##	Allow the specified domain to establish a TCP connection
+##	to goose-proxy's listening port (goose_proxy_port_t).
+##	Use this for client domains (e.g., a CLI tool) that
+##	need to communicate with the proxy.
+##	</p>
+## </desc>
+## <param name="domain">
+##	<summary>
+##	Domain allowed to connect.
+##	</summary>
+## </param>
+#
+interface(`goose_proxy_connect',`
+	gen_require(`
+		type goose_proxy_port_t;
+	')
+
+	corenet_tcp_recvfrom_unlabeled($1)
+	corenet_tcp_sendrecv_generic_if($1)
+	corenet_tcp_sendrecv_generic_node($1)
+	corenet_sendrecv_generic_client_packets($1)
+	allow $1 goose_proxy_port_t:tcp_socket name_connect;
+')
+
+######################################
+## <summary>
+##	Read goose-proxy configuration files.
+## </summary>
+## <desc>
+##	<p>
+##	Allow the specified domain to read the goose-proxy
+##	configuration directory and files under
+##	/etc/xdg/goose-proxy/.  Useful for CLI tools that
+##	need to parse or validate the proxy configuration.
+##	</p>
+## </desc>
+## <param name="domain">
+##	<summary>
+##	Domain allowed to read the config.
+##	</summary>
+## </param>
+#
+interface(`goose_proxy_read_config',`
+	gen_require(`
+		type goose_proxy_conf_t;
+	')
+
+	files_search_etc($1)
+	allow $1 goose_proxy_conf_t:dir search_dir_perms;
+	allow $1 goose_proxy_conf_t:file read_file_perms;
+')

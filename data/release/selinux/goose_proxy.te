@@ -1,0 +1,115 @@
+policy_module(goose_proxy, 1.1.0)
+
+########################################
+#
+# Declarations
+#
+
+type goose_proxy_t;
+type goose_proxy_exec_t;
+init_daemon_domain(goose_proxy_t, goose_proxy_exec_t)
+
+# Isolates the config directory (/etc/xdg/goose-proxy/) from generic
+# etc_t so only goose_proxy_t and explicitly granted domains can read it.
+type goose_proxy_conf_t;
+files_config_file(goose_proxy_conf_t)
+
+# Listening port type. Administrators assign the actual port number with:
+#   semanage port -a -t goose_proxy_port_t -p tcp 8080
+type goose_proxy_port_t;
+corenet_port(goose_proxy_port_t)
+
+########################################
+#
+# goose_proxy_t local policy
+#
+
+# ------ Basic process permissions ------
+
+allow goose_proxy_t self:fifo_file rw_fifo_file_perms;
+allow goose_proxy_t self:unix_stream_socket create_stream_socket_perms;
+
+# ------ Network: inbound (listen on localhost) ------
+
+allow goose_proxy_t self:tcp_socket create_stream_socket_perms;
+allow goose_proxy_t goose_proxy_port_t:tcp_socket name_bind;
+corenet_tcp_bind_generic_node(goose_proxy_t)
+
+# ------ Network: outbound (mTLS to backend on port 443) ------
+
+corenet_tcp_connect_http_port(goose_proxy_t)
+corenet_sendrecv_generic_client_packets(goose_proxy_t)
+corenet_tcp_sendrecv_generic_if(goose_proxy_t)
+corenet_tcp_sendrecv_generic_node(goose_proxy_t)
+
+# ------ Network: DNS resolution ------
+
+sysnet_dns_name_resolve(goose_proxy_t)
+
+# ------ Filesystem: application configuration ------
+
+allow goose_proxy_t goose_proxy_conf_t:dir search_dir_perms;
+allow goose_proxy_t goose_proxy_conf_t:file read_file_perms;
+
+# ------ Filesystem: generic /etc files ------
+
+# Python needs resolv.conf, nsswitch.conf, ld.so.cache, mime.types, etc.
+files_read_etc_files(goose_proxy_t)
+files_read_etc_runtime_files(goose_proxy_t)
+
+# ------ Filesystem: mTLS credentials ------
+
+# Fallback path: /etc/pki/consumer/{cert,key}.pem
+miscfiles_read_generic_certs(goose_proxy_t)
+
+# Primary path: $CREDENTIALS_DIRECTORY set by systemd LoadCredential.
+# On RHEL 9 these files inherit init_var_run_t.
+init_read_pid_files(goose_proxy_t)
+
+# On Fedora 40+ / RHEL 10+ they are labeled systemd_credential_t.
+optional_policy(`
+    gen_require(`
+        type systemd_credential_t;
+    ')
+    allow goose_proxy_t systemd_credential_t:dir search_dir_perms;
+    allow goose_proxy_t systemd_credential_t:file read_file_perms;
+')
+
+# ------ Filesystem: Python runtime ------
+
+libs_use_ld_so(goose_proxy_t)
+libs_use_shared_libs(goose_proxy_t)
+files_read_usr_files(goose_proxy_t)
+corecmd_exec_bin(goose_proxy_t)
+miscfiles_read_localization(goose_proxy_t)
+
+# ------ /proc and device access ------
+
+kernel_read_system_state(goose_proxy_t)
+dev_read_urand(goose_proxy_t)
+dev_read_rand(goose_proxy_t)
+
+# ------ Logging (stdout/stderr via systemd journal) ------
+
+logging_send_syslog_msg(goose_proxy_t)
+
+# ------ Interactive file descriptors ------
+
+domain_use_interactive_fds(goose_proxy_t)
+
+# ------ NSSwitch (getaddrinfo, getpwnam via nss modules) ------
+
+auth_use_nsswitch(goose_proxy_t)
+
+# ------ Systemd socket activation (future) ------
+
+# When systemd passes a pre-opened listening socket via fd inheritance,
+# the daemon needs to accept/read/write on a socket owned by init_t.
+init_use_fds(goose_proxy_t)
+
+optional_policy(`
+    gen_require(`
+        type init_t;
+    ')
+    allow goose_proxy_t init_t:tcp_socket { read write getattr accept listen };
+')

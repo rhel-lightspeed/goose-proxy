@@ -48,6 +48,7 @@ lint = [
 ]
 
 test = [
+    "httpx>=0.28",
     "pytest-asyncio>=0.25",
     "pytest-cov>=7.0.0",
     "pytest>=8.0",

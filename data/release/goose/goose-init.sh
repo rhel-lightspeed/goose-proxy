@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 	
 	
 # Red Hat specific customizations

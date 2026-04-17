@@ -1,0 +1,4 @@
+# Constraints for Python 3.9 (RHEL 9) vendored wheel downloads.
+# httptools 0.7+ dropped prebuilt cp39 wheels, so we pin to the latest
+# version that still publishes them.
+httptools<0.7 ; python_version < "3.10"

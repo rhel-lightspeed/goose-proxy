@@ -5,7 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "goose-proxy"
 description = "A proxy that translates OpenAI Chat Completions API to Responses API for RHEL Lightspeed"
+authors = [
+    { name = "RHEL Lightspeed Team", email = "rhel-sst-lightspeed@redhat.com" },
+]
 readme = "README.md"
+license-files = ["LICENSE"]
 dependencies = [
     # tomli is only required below 3.11 as it is native after that version.
     'tomli; python_version<"3.11"',
@@ -15,8 +19,7 @@ dependencies = [
 ]
 # Python 3.9 is the minimum version available in RHEL 9, our lowest target.
 requires-python = ">=3.9"
-license-files = ["LICENSE"]
-dynamic = ["version"]
+version = "0.1.0"
 classifiers = ["Programming Language :: Python :: 3"]
 
 [project.urls]
@@ -26,8 +29,14 @@ classifiers = ["Programming Language :: Python :: 3"]
 [project.scripts]
 goose-proxy = "goose_proxy.cli:serve"
 
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# Include compiled extensions (.so) from vendored packages (e.g. pydantic_core).
+# setuptools only includes .py files by default.
+[tool.setuptools.package-data]
+"*" = ["*.so"]
 
 [dependency-groups]
 dev = [

@@ -1,8 +1,8 @@
 {
-    "name": "custom_goose-proxy",
+    "name": "rhel_cla",
     "engine": "openai",
     "display_name": "RHEL command line assistant",
-    "description": "Custom goose-proxy provider for RHEL command line assistant",
+    "description": "Inference provided by Red Hat with RHEL specific knowledge",
     "api_key_env": "",
     "base_url": "http://127.0.0.1:7080",
     "base_path": "v1/chat/completions",
@@ -14,8 +14,8 @@
             "output_token_cost": null,
             "currency": null,
             "supports_cache_control": null
-        }
-    ],
+    }
+  ],
     "headers": {},
     "timeout_seconds": null,
     "supports_streaming": true,

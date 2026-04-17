@@ -1,17 +1,21 @@
 extensions:
-  linux-tools:
-    enabled: true
-    type: stdio
-    name: linux-tools
-    description: Linux Tools
-    cmd: linux-mcp-server
-    args: []
-    envs:
-      LINUX_MCP_ALLOWED_LOG_PATHS: /var/log/messages
-    env_keys: []
-    timeout: 30
-    bundled: null
-    available_tools: []
+  # See installation and configuration documents to use the Linux MCP Server
+  # https://rhel-lightspeed.github.io/linux-mcp-server/install/
+  # https://rhel-lightspeed.github.io/linux-mcp-server/clients/#goose
+  #
+  # linux-tools:
+  #   enabled: true
+  #   type: stdio
+  #   name: linux-tools
+  #   description: Linux Tools
+  #   cmd: linux-mcp-server
+  #   args: []
+  #   envs:
+  #     LINUX_MCP_ALLOWED_LOG_PATHS: /var/log/messages
+  #   env_keys: []
+  #   timeout: 30
+  #   bundled: null
+  #   available_tools: []
   extensionmanager:
     enabled: true
     type: platform
@@ -82,14 +86,14 @@ GOOSE_DISABLE_SESSION_NAMING: true
 GOOSE_MAX_TOKENS: 16000
 GOOSE_MAX_TURNS: 200
 GOOSE_MODE: approve
+GOOSE_MODEL: RHEL-command-line-assistant
 GOOSE_MOIM_MESSAGE_TEXT: "You are a Red Hat Enterprise Linux expert."
+GOOSE_PROVIDER: rhel_cla
 GOOSE_RANDOM_THINKING_MESSAGES: false
 GOOSE_SUBAGENT_MAX_TURNS: 25
 GOOSE_TELEMETRY_ENABLED: false
+OPENAI_BASE_PATH: v1/chat/completions
+OPENAI_HOST: http://127.0.0.1:7080
 OTEL_SDK_DISABLED: true
 SECURITY_PROMPT_ENABLED: true
 SECURITY_PROMPT_THRESHOLD: 0.9
-OPENAI_HOST: http://127.0.0.1:7080
-OPENAI_BASE_PATH: v1/chat/completions
-GOOSE_PROVIDER: custom_goose-proxy
-GOOSE_MODEL: RHEL-command-line-assistant

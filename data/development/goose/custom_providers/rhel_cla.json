@@ -1,14 +1,14 @@
 {
-  "name": "custom_goose-proxy",
+  "name": "rhel_cla",
   "engine": "openai",
-  "display_name": "goose-proxy",
-  "description": "Custom goose-proxy provider",
+  "display_name": "RHEL command line assistant",
+  "description": "Inference provided by Red Hat with RHEL specific knowledge",
   "api_key_env": "",
   "base_url": "http://127.0.0.1:7080",
   "base_path": "v1/responses",
   "models": [
     {
-      "name": "rhel-lightspeed/goose",
+      "name": "RHEL-command-line-assistant",
       "context_limit": 128000,
       "input_token_cost": null,
       "output_token_cost": null,

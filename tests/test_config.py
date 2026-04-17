@@ -1,11 +1,18 @@
 """Tests for configuration loading and validation."""
 
 import os
+import sys
 
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib  # type: ignore[ty:unresolved-import]
 
 from goose_proxy.config import Auth
 from goose_proxy.config import Backend
@@ -86,36 +93,36 @@ class TestGetSettings:
     def teardown_method(self):
         get_settings.cache_clear()
 
-    def test_returns_defaults_when_config_not_found(self, tmp_path):
-        with patch.dict(os.environ, {"XDG_CONFIG_DIRS": str(tmp_path)}):
-            settings = get_settings()
+    def test_returns_defaults_when_config_not_found(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("XDG_CONFIG_DIRS", str(tmp_path))
+        settings = get_settings()
 
         assert isinstance(settings, Settings)
         assert settings.backend.timeout == 30
         assert settings.logging.level == "INFO"
 
-    def test_returns_defaults_when_permission_denied(self, tmp_path):
+    def test_returns_defaults_when_permission_denied(self, tmp_path, monkeypatch):
         config_dir = tmp_path / "goose-proxy"
         config_dir.mkdir()
         config_file = config_dir / "config.toml"
         config_file.write_text("[backend]\ntimeout = 99\n")
         config_file.chmod(0o000)
 
-        with patch.dict(os.environ, {"XDG_CONFIG_DIRS": str(tmp_path)}):
-            settings = get_settings()
+        monkeypatch.setenv("XDG_CONFIG_DIRS", str(tmp_path))
+        settings = get_settings()
 
         # Should get defaults (timeout=30), NOT the value in the unreadable file (99)
         assert settings.backend.timeout == 30
         assert settings.logging.level == "INFO"
 
-    def test_reads_valid_config_file(self, tmp_path):
+    def test_reads_valid_config_file(self, tmp_path, monkeypatch):
         config_dir = tmp_path / "goose-proxy"
         config_dir.mkdir()
         config_file = config_dir / "config.toml"
         config_file.write_text('[backend]\ntimeout = 99\n\n[logging]\nlevel = "DEBUG"\n')
 
-        with patch.dict(os.environ, {"XDG_CONFIG_DIRS": str(tmp_path)}):
-            settings = get_settings()
+        monkeypatch.setenv("XDG_CONFIG_DIRS", str(tmp_path))
+        settings = get_settings()
 
         assert settings.backend.timeout == 99
         assert settings.logging.level == "DEBUG"
@@ -126,9 +133,9 @@ class TestGetSettings:
         config_file = config_dir / "config.toml"
         config_file.write_text('[backend]\ntimeout = 99\ntimeout = 30\n\n[logging]\nlevel = "DEBUG"\n')
 
-        monkeypatch.setattr("os.environ", {"XDG_CONFIG_DIRS": str(tmp_path)})
+        monkeypatch.setenv("XDG_CONFIG_DIRS", str(tmp_path))
 
-        with pytest.raises(SystemExit, match="Problem reading config file"):
+        with pytest.raises(tomllib.TOMLDecodeError):
             get_settings()
 
 
@@ -140,27 +147,31 @@ class TestGetXdgConfigPath:
             result = get_xdg_config_path()
         assert result == Path("/etc/xdg")
 
-    def test_returns_single_path_directly(self, tmp_path):
-        with patch.dict(os.environ, {"XDG_CONFIG_DIRS": str(tmp_path)}):
-            result = get_xdg_config_path()
+    def test_returns_single_path_directly(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("XDG_CONFIG_DIRS", str(tmp_path))
+        result = get_xdg_config_path()
+
         assert result == tmp_path
 
-    def test_returns_first_existing_path_from_multiple(self, tmp_path):
+    def test_returns_first_existing_path_from_multiple(self, tmp_path, monkeypatch):
         existing = tmp_path / "existing"
         existing.mkdir()
         nonexistent = tmp_path / "nonexistent"
         paths = f"{nonexistent}{os.pathsep}{existing}"
-        with patch.dict(os.environ, {"XDG_CONFIG_DIRS": paths}):
-            result = get_xdg_config_path()
+        monkeypatch.setenv("XDG_CONFIG_DIRS", paths)
+        result = get_xdg_config_path()
+
         assert result == existing
 
-    def test_returns_etc_xdg_when_no_paths_exist(self, tmp_path):
+    def test_returns_etc_xdg_when_no_paths_exist(self, tmp_path, monkeypatch):
         paths = f"{tmp_path}/a{os.pathsep}{tmp_path}/b"
-        with patch.dict(os.environ, {"XDG_CONFIG_DIRS": paths}):
-            result = get_xdg_config_path()
+        monkeypatch.setenv("XDG_CONFIG_DIRS", paths)
+        result = get_xdg_config_path()
+
         assert result == Path("/etc/xdg")
 
-    def test_empty_env_var_returns_default(self):
-        with patch.dict(os.environ, {"XDG_CONFIG_DIRS": ""}):
-            result = get_xdg_config_path()
+    def test_empty_env_var_returns_default(self, monkeypatch):
+        monkeypatch.setenv("XDG_CONFIG_DIRS", "")
+        result = get_xdg_config_path()
+
         assert result == Path("/etc/xdg")

@@ -1,7 +1,7 @@
-"""Tests for Responses API streaming → Chat Completions SSE translation."""
-
 import json
 import typing as t
+
+import pytest
 
 from goose_proxy.models.responses import Response
 from goose_proxy.models.responses import ResponseCompletedEvent
@@ -15,19 +15,24 @@ from goose_proxy.models.responses import ResponseUsage
 from goose_proxy.translators.streaming import translate_stream
 
 
-def _make_base_response(response_id="resp_1", status="in_progress", output=None, usage=None):
-    return Response(
-        id=response_id,
-        created_at=1700000000,
-        model="rhel-lightspeed/vertex",
-        object="response",
-        output=output or [],
-        status=status,
-        usage=usage,
-    )
+@pytest.fixture
+def base_response():
+    def _base_response(response_id="resp_1", status="in_progress", output=None, usage=None):
+        return Response(
+            id=response_id,
+            created_at=1700000000,
+            model="rhel-lightspeed/vertex",
+            object="response",
+            output=output or [],
+            status=status,
+            usage=usage,
+        )
+
+    return _base_response
 
 
-def _make_usage():
+@pytest.fixture
+def response_usage():
     return ResponseUsage(
         input_tokens=10,
         output_tokens=5,
@@ -35,48 +40,49 @@ def _make_usage():
     )
 
 
-def _parse_sse_line(line: str) -> t.Any:
-    """Parse a single SSE data line into a dict or raw string."""
-    assert line.startswith("data: ")
-    payload = line.removeprefix("data: ").strip()
-    if payload == "[DONE]":
-        return "[DONE]"
-    return json.loads(payload)
+@pytest.fixture
+def parse_sse_line():
+    def _parse_sse_line(line: str) -> t.Any:
+        assert line.startswith("data: ")
+        payload = line.removeprefix("data: ").strip()
+        if payload == "[DONE]":
+            return "[DONE]"
+
+        return json.loads(payload)
+
+    return _parse_sse_line
 
 
-async def _collect_chunks(events, model="rhel-lightspeed/vertex"):
-    """Run translate_stream and collect all SSE lines."""
+@pytest.fixture
+def collect_chunks():
+    def _collect_chunks(events, model="rhel-lightspeed/vertex"):
+        return list(translate_stream(iter(events), model))
 
-    async def event_iter():
-        for e in events:
-            yield e
-
-    chunks = []
-    async for line in translate_stream(event_iter(), model):
-        chunks.append(line)
-    return chunks
+    return _collect_chunks
 
 
 # --- Text streaming ---
 
 
 class TestTextStreaming:
-    async def test_initial_role_chunk(self):
+    def test_initial_role_chunk(self, base_response, collect_chunks, parse_sse_line):
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
         ]
-        chunks = await _collect_chunks(events)
-        data = _parse_sse_line(chunks[0])
+
+        chunks = collect_chunks(events)
+        data = parse_sse_line(chunks[0])
+
         assert data["choices"][0]["delta"] == {"role": "assistant"}
 
-    async def test_text_delta_chunks(self):
+    def test_text_delta_chunks(self, base_response, collect_chunks, parse_sse_line):
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
@@ -89,14 +95,16 @@ class TestTextStreaming:
                 type="response.output_text.delta",
             ),
         ]
-        chunks = await _collect_chunks(events)
-        data = _parse_sse_line(chunks[1])
+
+        chunks = collect_chunks(events)
+        data = parse_sse_line(chunks[1])
+
         assert data["choices"][0]["delta"] == {"content": "Hello"}
 
-    async def test_multiple_text_deltas(self):
+    def test_multiple_text_deltas(self, base_response, collect_chunks, parse_sse_line):
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
@@ -117,15 +125,16 @@ class TestTextStreaming:
                 type="response.output_text.delta",
             ),
         ]
-        chunks = await _collect_chunks(events)
-        # role chunk + 2 text chunks + [DONE]
-        assert _parse_sse_line(chunks[1])["choices"][0]["delta"]["content"] == "Hel"
-        assert _parse_sse_line(chunks[2])["choices"][0]["delta"]["content"] == "lo!"
 
-    async def test_empty_text_delta(self):
+        chunks = collect_chunks(events)
+
+        assert parse_sse_line(chunks[1])["choices"][0]["delta"]["content"] == "Hel"
+        assert parse_sse_line(chunks[2])["choices"][0]["delta"]["content"] == "lo!"
+
+    def test_empty_text_delta(self, base_response, collect_chunks, parse_sse_line):
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
@@ -138,8 +147,10 @@ class TestTextStreaming:
                 type="response.output_text.delta",
             ),
         ]
-        chunks = await _collect_chunks(events)
-        data = _parse_sse_line(chunks[1])
+
+        chunks = collect_chunks(events)
+        data = parse_sse_line(chunks[1])
+
         assert data["choices"][0]["delta"]["content"] == ""
 
 
@@ -147,7 +158,7 @@ class TestTextStreaming:
 
 
 class TestToolCallStreaming:
-    async def test_function_call_added(self):
+    def test_function_call_added(self, base_response, collect_chunks, parse_sse_line):
         fc = ResponseFunctionToolCall(
             arguments="",
             call_id="call_1",
@@ -158,7 +169,7 @@ class TestToolCallStreaming:
         )
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
@@ -169,16 +180,18 @@ class TestToolCallStreaming:
                 type="response.output_item.added",
             ),
         ]
-        chunks = await _collect_chunks(events)
-        data = _parse_sse_line(chunks[1])
+
+        chunks = collect_chunks(events)
+        data = parse_sse_line(chunks[1])
         tc = data["choices"][0]["delta"]["tool_calls"][0]
+
         assert tc["id"] == "call_1"
         assert tc["type"] == "function"
         assert tc["function"]["name"] == "get_weather"
         assert tc["function"]["arguments"] == ""
         assert tc["index"] == 0
 
-    async def test_function_call_arguments_delta(self):
+    def test_function_call_arguments_delta(self, base_response, collect_chunks, parse_sse_line):
         fc = ResponseFunctionToolCall(
             arguments="",
             call_id="call_1",
@@ -189,7 +202,7 @@ class TestToolCallStreaming:
         )
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
@@ -207,13 +220,15 @@ class TestToolCallStreaming:
                 type="response.function_call_arguments.delta",
             ),
         ]
-        chunks = await _collect_chunks(events)
-        data = _parse_sse_line(chunks[2])
+
+        chunks = collect_chunks(events)
+        data = parse_sse_line(chunks[2])
         tc = data["choices"][0]["delta"]["tool_calls"][0]
+
         assert tc["function"]["arguments"] == '{"loc'
         assert tc["index"] == 0
 
-    async def test_multiple_function_calls_indexed(self):
+    def test_multiple_function_calls_indexed(self, base_response, collect_chunks, parse_sse_line):
         fc1 = ResponseFunctionToolCall(
             arguments="",
             call_id="call_1",
@@ -232,7 +247,7 @@ class TestToolCallStreaming:
         )
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
@@ -249,14 +264,15 @@ class TestToolCallStreaming:
                 type="response.output_item.added",
             ),
         ]
-        chunks = await _collect_chunks(events)
-        tc1 = _parse_sse_line(chunks[1])["choices"][0]["delta"]["tool_calls"][0]
-        tc2 = _parse_sse_line(chunks[2])["choices"][0]["delta"]["tool_calls"][0]
+
+        chunks = collect_chunks(events)
+        tc1 = parse_sse_line(chunks[1])["choices"][0]["delta"]["tool_calls"][0]
+        tc2 = parse_sse_line(chunks[2])["choices"][0]["delta"]["tool_calls"][0]
+
         assert tc1["index"] == 0
         assert tc2["index"] == 1
 
-    async def test_function_call_then_text(self):
-        """Mixed tool and text streaming in sequence."""
+    def test_function_call_then_text(self, base_response, collect_chunks, parse_sse_line):
         fc = ResponseFunctionToolCall(
             arguments="",
             call_id="call_1",
@@ -274,7 +290,7 @@ class TestToolCallStreaming:
         )
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
@@ -299,12 +315,14 @@ class TestToolCallStreaming:
                 type="response.output_text.delta",
             ),
         ]
-        chunks = await _collect_chunks(events)
+
+        chunks = collect_chunks(events)
+        tc_data = parse_sse_line(chunks[1])
+        text_data = parse_sse_line(chunks[2])
+
         # role, tool_call, text, [DONE]
         # (message added event doesn't emit a new chunk when role already sent)
-        tc_data = _parse_sse_line(chunks[1])
         assert "tool_calls" in tc_data["choices"][0]["delta"]
-        text_data = _parse_sse_line(chunks[2])
         assert text_data["choices"][0]["delta"]["content"] == "Hi"
 
 
@@ -312,38 +330,42 @@ class TestToolCallStreaming:
 
 
 class TestStreamLifecycle:
-    async def test_stream_starts_with_role(self):
+    def test_stream_starts_with_role(self, base_response, collect_chunks, parse_sse_line):
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
         ]
-        chunks = await _collect_chunks(events)
-        data = _parse_sse_line(chunks[0])
+
+        chunks = collect_chunks(events)
+        data = parse_sse_line(chunks[0])
+
         assert data["choices"][0]["delta"]["role"] == "assistant"
 
-    async def test_stream_ends_with_done(self):
+    def test_stream_ends_with_done(self, base_response, response_usage, collect_chunks):
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
             ResponseCompletedEvent(
-                response=_make_base_response(status="completed", usage=_make_usage()),
+                response=base_response(status="completed", usage=response_usage),
                 sequence_number=1,
                 type="response.completed",
             ),
         ]
-        chunks = await _collect_chunks(events)
+
+        chunks = collect_chunks(events)
+
         assert chunks[-1] == "data: [DONE]\n\n"
 
-    async def test_finish_reason_stop_in_final(self):
+    def test_finish_reason_stop_in_final(self, base_response, response_usage, collect_chunks, parse_sse_line):
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
@@ -356,17 +378,18 @@ class TestStreamLifecycle:
                 type="response.output_text.delta",
             ),
             ResponseCompletedEvent(
-                response=_make_base_response(status="completed", usage=_make_usage()),
+                response=base_response(status="completed", usage=response_usage),
                 sequence_number=2,
                 type="response.completed",
             ),
         ]
-        chunks = await _collect_chunks(events)
-        # Last data chunk before [DONE]
-        data = _parse_sse_line(chunks[-2])
+
+        chunks = collect_chunks(events)
+        data = parse_sse_line(chunks[-2])
+
         assert data["choices"][0]["finish_reason"] == "stop"
 
-    async def test_finish_reason_tool_calls_in_final(self):
+    def test_finish_reason_tool_calls_in_final(self, base_response, response_usage, collect_chunks, parse_sse_line):
         fc = ResponseFunctionToolCall(
             arguments="",
             call_id="call_1",
@@ -377,7 +400,7 @@ class TestStreamLifecycle:
         )
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
@@ -388,19 +411,21 @@ class TestStreamLifecycle:
                 type="response.output_item.added",
             ),
             ResponseCompletedEvent(
-                response=_make_base_response(status="completed", usage=_make_usage()),
+                response=base_response(status="completed", usage=response_usage),
                 sequence_number=2,
                 type="response.completed",
             ),
         ]
-        chunks = await _collect_chunks(events)
-        data = _parse_sse_line(chunks[-2])
+
+        chunks = collect_chunks(events)
+        data = parse_sse_line(chunks[-2])
+
         assert data["choices"][0]["finish_reason"] == "tool_calls"
 
-    async def test_finish_reason_length_when_incomplete(self):
+    def test_finish_reason_length_when_incomplete(self, base_response, response_usage, collect_chunks, parse_sse_line):
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
@@ -413,30 +438,34 @@ class TestStreamLifecycle:
                 type="response.output_text.delta",
             ),
             ResponseCompletedEvent(
-                response=_make_base_response(status="incomplete", usage=_make_usage()),
+                response=base_response(status="incomplete", usage=response_usage),
                 sequence_number=2,
                 type="response.completed",
             ),
         ]
-        chunks = await _collect_chunks(events)
-        data = _parse_sse_line(chunks[-2])
+
+        chunks = collect_chunks(events)
+        data = parse_sse_line(chunks[-2])
+
         assert data["choices"][0]["finish_reason"] == "length"
 
-    async def test_usage_in_completed_event(self):
+    def test_usage_in_completed_event(self, base_response, response_usage, collect_chunks, parse_sse_line):
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
             ResponseCompletedEvent(
-                response=_make_base_response(status="completed", usage=_make_usage()),
+                response=base_response(status="completed", usage=response_usage),
                 sequence_number=1,
                 type="response.completed",
             ),
         ]
-        chunks = await _collect_chunks(events)
-        data = _parse_sse_line(chunks[-2])
+
+        chunks = collect_chunks(events)
+        data = parse_sse_line(chunks[-2])
+
         assert data["usage"]["prompt_tokens"] == 10
         assert data["usage"]["completion_tokens"] == 5
         assert data["usage"]["total_tokens"] == 15
@@ -446,23 +475,25 @@ class TestStreamLifecycle:
 
 
 class TestSSEFormat:
-    async def test_chunk_format(self):
+    def test_chunk_format(self, base_response, collect_chunks):
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
         ]
-        chunks = await _collect_chunks(events)
+
+        chunks = collect_chunks(events)
+
         for chunk in chunks:
             assert chunk.startswith("data: ")
             assert chunk.endswith("\n\n")
 
-    async def test_chunk_json_valid(self):
+    def test_chunk_json_valid(self, base_response, collect_chunks, parse_sse_line):
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
@@ -475,35 +506,41 @@ class TestSSEFormat:
                 type="response.output_text.delta",
             ),
         ]
-        chunks = await _collect_chunks(events)
+
+        chunks = collect_chunks(events)
+
         for chunk in chunks:
-            parsed = _parse_sse_line(chunk)
+            parsed = parse_sse_line(chunk)
             if parsed == "[DONE]":
                 continue
             assert isinstance(parsed, dict)
 
-    async def test_chunk_object_type(self):
+    def test_chunk_object_type(self, base_response, collect_chunks, parse_sse_line):
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
         ]
-        chunks = await _collect_chunks(events)
-        data = _parse_sse_line(chunks[0])
+
+        chunks = collect_chunks(events)
+        data = parse_sse_line(chunks[0])
+
         assert data["object"] == "chat.completion.chunk"
 
-    async def test_chunk_model_preserved(self):
+    def test_chunk_model_preserved(self, base_response, collect_chunks, parse_sse_line):
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
         ]
-        chunks = await _collect_chunks(events, model="my-model")
-        data = _parse_sse_line(chunks[0])
+
+        chunks = collect_chunks(events, model="my-model")
+        data = parse_sse_line(chunks[0])
+
         assert data["model"] == "my-model"
 
 
@@ -511,39 +548,42 @@ class TestSSEFormat:
 
 
 class TestEdgeCases:
-    async def test_unknown_event_ignored(self):
-        """Events we don't handle should be silently skipped."""
-
+    def test_unknown_event_ignored(self, base_response, response_usage, collect_chunks):
         class UnknownEvent:
             type = "response.unknown_event"
 
         events = [
             ResponseCreatedEvent(
-                response=_make_base_response(),
+                response=base_response(),
                 sequence_number=0,
                 type="response.created",
             ),
             UnknownEvent(),
             ResponseCompletedEvent(
-                response=_make_base_response(status="completed", usage=_make_usage()),
+                response=base_response(status="completed", usage=response_usage),
                 sequence_number=2,
                 type="response.completed",
             ),
         ]
-        chunks = await _collect_chunks(events)
+
+        chunks = collect_chunks(events)
+
         # Should still get: role chunk, completed chunk, [DONE]
         assert len(chunks) == 3
 
-    async def test_empty_stream(self):
         """Stream with only completed event produces minimal output."""
+
+    def test_empty_stream(self, base_response, response_usage, collect_chunks):
         events = [
             ResponseCompletedEvent(
-                response=_make_base_response(status="completed", usage=_make_usage()),
+                response=base_response(status="completed", usage=response_usage),
                 sequence_number=0,
                 type="response.completed",
             ),
         ]
-        chunks = await _collect_chunks(events)
+
+        chunks = collect_chunks(events)
+
         # completed chunk + [DONE]
         assert len(chunks) == 2
         assert chunks[-1] == "data: [DONE]\n\n"

@@ -1,10 +1,11 @@
 import json
 import logging
+import ssl
 import typing as t
+import urllib.error
+import urllib.request
 
-from collections.abc import AsyncIterator
-
-import httpx
+from collections.abc import Iterator
 
 from fastapi import APIRouter
 from fastapi import Depends
@@ -28,80 +29,113 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1")
 
 
-async def get_http_client():
-    logger.debug("Getting HTTP Client")
-    settings = get_settings()
-    backend = settings.backend
-    cert = (str(backend.auth.cert_file), str(backend.auth.key_file))
+class BackendClient:
+    def __init__(
+        self,
+        base_url: str,
+        ssl_context: ssl.SSLContext,
+        timeout: int,
+        headers: dict,
+        proxy: str = "",
+    ):
+        self.base_url = base_url.rstrip("/")
+        self.ssl_context = ssl_context
+        self.timeout = timeout
+        self.headers = headers
 
-    http_client = httpx.AsyncClient(
-        base_url=backend.endpoint,
-        cert=cert,
-        timeout=backend.timeout,
-        proxy=backend.proxy or None,
-        headers={
-            "Accept": "application/json",
-            "X-LCS-Merge-Server-Tools": "true",
-        },
-    )
+        if proxy:
+            proxy_handler = urllib.request.ProxyHandler({"https": proxy, "http": proxy})
+            https_handler = urllib.request.HTTPSHandler(context=self.ssl_context)
+            self.opener = urllib.request.build_opener(proxy_handler, https_handler)
+        else:
+            https_handler = urllib.request.HTTPSHandler(context=self.ssl_context)
+            self.opener = urllib.request.build_opener(https_handler)
 
-    yield http_client
+    def post(self, path: str, body: dict) -> urllib.request.Request:
+        url = self.base_url + path
+        data = json.dumps(body).encode()
+        req = urllib.request.Request(url, data=data, method="POST")
+        for key, value in self.headers.items():
+            req.add_header(key, value)
 
-    await http_client.aclose()
+        req.add_header("Content-Type", "application/json")
 
+        return req
 
-async def create_response(client: httpx.AsyncClient, **params) -> Response:
-    """Create a response via the Responses API."""
-    resp = await client.post("/responses", json=params)
-    resp.raise_for_status()
-    return Response.model_validate(resp.json())
+    def send(self, req: urllib.request.Request):
+        return self.opener.open(req, timeout=self.timeout)
 
+    @classmethod
+    def create(cls) -> "BackendClient":
+        logger.debug("Getting backend client")
+        settings = get_settings()
+        backend = settings.backend
 
-async def stream_response(client: httpx.AsyncClient, **params) -> AsyncIterator[StreamEvent]:
-    """Stream a response and yield parsed event models."""
-    async with client.stream(
-        "POST",
-        "/responses",
-        json=params,
-    ) as resp:
-        if resp.is_error:
-            await resp.aread()
-            resp.raise_for_status()
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ctx.load_cert_chain(str(backend.auth.cert_file), str(backend.auth.key_file))
+        ctx.load_default_certs()
 
-        async for line in resp.aiter_lines():
-            line = line.strip()
-            if not line or line.startswith("event:"):
-                continue
-            if line.startswith("data: "):
-                payload = line[6:]
-                if payload == "[DONE]":
-                    break
-                try:
-                    data = json.loads(payload)
-                except json.JSONDecodeError:
-                    logger.warning("Skipping malformed SSE data: %s", payload[:120])
+        client = cls(
+            base_url=backend.endpoint,
+            ssl_context=ctx,
+            timeout=backend.timeout,
+            proxy=backend.proxy,
+            headers={
+                "Accept": "application/json",
+                "X-LCS-Merge-Server-Tools": "true",
+            },
+        )
+
+        return client
+
+    def create_response(self, **params) -> Response:
+        req = self.post("/responses", body=params)
+        with self.send(req) as resp:
+            data = json.loads(resp.read().decode())
+
+        return Response.model_validate(data)
+
+    def stream_response(self, **params) -> Iterator[StreamEvent]:
+        req = self.post("/responses", body=params)
+        with self.send(req) as resp:
+            for raw_line in resp:
+                line = raw_line.decode().strip()
+                if not line or line.startswith("event:"):
                     continue
-                event = parse_stream_event(data)
-                if event is not None:
-                    yield event
+
+                if line.startswith("data: "):
+                    payload = line[6:]
+                    if payload == "[DONE]":
+                        break
+
+                    try:
+                        data = json.loads(payload)
+                    except json.JSONDecodeError:
+                        logger.warning("Skipping malformed SSE data: %s", payload[:120])
+                        continue
+
+                    event = parse_stream_event(data)
+                    if event is not None:
+                        yield event
 
 
 @router.post("/chat/completions", response_model_exclude_none=True)
 async def chat_completions(
     data: ChatCompletionRequest,
-    client: t.Annotated[httpx.AsyncClient, Depends(get_http_client)],
+    client: t.Annotated[BackendClient, Depends(BackendClient.create)],
 ):
     params = translate_request(data)
     if data.stream:
-        stream = stream_response(client, **params)
+        stream = client.stream_response(**params)
 
-        async def generate():
-            async for line in translate_stream(stream, data.model):
+        def generate():
+            for line in translate_stream(stream, data.model):
                 yield line
 
         return StreamingResponse(generate(), media_type="text/event-stream")
 
-    response = await create_response(client, **params)
+    response = client.create_response(**params)
+
     return translate_response(response, data.model)
 
 

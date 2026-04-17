@@ -4,7 +4,7 @@ import json
 import time
 import typing as t
 
-from collections.abc import AsyncIterator
+from collections.abc import Iterator
 
 from goose_proxy.models.responses import ResponseCompletedEvent
 from goose_proxy.models.responses import ResponseCreatedEvent
@@ -39,6 +39,7 @@ def _make_chunk(
         ],
         "usage": usage,
     }
+
     return f"data: {json.dumps(chunk)}\n\n"
 
 
@@ -78,6 +79,7 @@ def _determine_finish_reason(event: ResponseCompletedEvent, has_tool_calls: bool
         reason = "tool_calls"
     if event.response.status == "incomplete":
         reason = "length"
+
     return reason
 
 
@@ -85,6 +87,7 @@ def _translate_usage(event: ResponseCompletedEvent) -> t.Optional[dict[str, int]
     """Extract usage from a completed event into Chat Completions format."""
     if event.response.usage is None:
         return None
+
     return {
         "prompt_tokens": event.response.usage.input_tokens,
         "completion_tokens": event.response.usage.output_tokens,
@@ -92,14 +95,14 @@ def _translate_usage(event: ResponseCompletedEvent) -> t.Optional[dict[str, int]
     }
 
 
-async def translate_stream(
-    stream: AsyncIterator[StreamEvent],
+def translate_stream(
+    stream: Iterator[StreamEvent],
     model: t.Optional[str],
-) -> AsyncIterator[str]:
+) -> Iterator[str]:
     """Translate Responses API stream events into Chat Completions SSE lines.
 
     Args:
-        stream: Async iterator of streaming event objects from the backend.
+        stream: Iterator of streaming event objects from the backend.
         model: The original model name from the request, or None to use the response model.
 
     Yields:
@@ -112,7 +115,7 @@ async def translate_stream(
     has_tool_calls = False
     sent_role = False
 
-    async for event in stream:
+    for event in stream:
         if isinstance(event, ResponseCreatedEvent):
             request_id = event.response.id
             created = int(event.response.created_at)

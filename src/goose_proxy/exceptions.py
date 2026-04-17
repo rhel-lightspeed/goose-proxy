@@ -1,6 +1,6 @@
+import json
 import logging
-
-import httpx
+import urllib.error
 
 from fastapi import FastAPI
 from fastapi import HTTPException
@@ -27,6 +27,7 @@ def _openai_error_response(status_code: int, message: str, error_type: str) -> J
 
 def _http_exception_handler(_: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, HTTPException)
+
     return _openai_error_response(
         status_code=exc.status_code,
         message=str(exc.detail),
@@ -34,32 +35,33 @@ def _http_exception_handler(_: Request, exc: Exception) -> JSONResponse:
     )
 
 
-def _http_status_error_handler(_: Request, exc: Exception) -> JSONResponse:
-    assert isinstance(exc, httpx.HTTPStatusError)
-    status_code = exc.response.status_code
+def _http_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, urllib.error.HTTPError)
+    body = exc.read().decode()
     try:
-        body = exc.response.json()
-        message = body.get("error", {}).get("message", str(exc))
-    except Exception:
-        message = exc.response.text or str(exc)
+        data = json.loads(body)
+        message = data.get("error", {}).get("message", str(exc))
+    except (json.JSONDecodeError, ValueError):
+        message = body or str(exc)
 
     return _openai_error_response(
-        status_code=status_code,
+        status_code=exc.code,
         message=message,
         error_type="api_error",
     )
 
 
-def _httpx_error_handler(_: Request, exc: Exception) -> JSONResponse:
+def _url_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, urllib.error.URLError)
+
     return _openai_error_response(
         status_code=502,
-        message=str(exc),
+        message=str(exc.reason),
         error_type="api_error",
     )
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    """Register exception handlers with the FastAPI app."""
     app.add_exception_handler(HTTPException, _http_exception_handler)
-    app.add_exception_handler(httpx.HTTPStatusError, _http_status_error_handler)
-    app.add_exception_handler(httpx.HTTPError, _httpx_error_handler)
+    app.add_exception_handler(urllib.error.HTTPError, _http_error_handler)
+    app.add_exception_handler(urllib.error.URLError, _url_error_handler)

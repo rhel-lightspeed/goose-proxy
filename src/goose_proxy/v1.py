@@ -24,7 +24,7 @@ from goose_proxy.translators import translate_response
 from goose_proxy.translators import translate_stream
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 router = APIRouter(prefix="/v1")
 
@@ -63,7 +63,16 @@ class BackendClient:
         return req
 
     def send(self, req: urllib.request.Request):
-        return self.opener.open(req, timeout=self.timeout)
+        try:
+            return self.opener.open(req, timeout=self.timeout)
+        except urllib.error.HTTPError:
+            logger.debug(
+                "Request that caused backend error\n\t\tRequest: %s %s\n\t\tRequest headers: %s",
+                req.get_method(),
+                req.full_url,
+                dict(req.headers),
+            )
+            raise
 
     @classmethod
     def create(cls) -> "BackendClient":
@@ -95,28 +104,42 @@ class BackendClient:
 
         return Response.model_validate(data)
 
-    def stream_response(self, **params) -> Iterator[StreamEvent]:
+    def open_stream(self, **params):
+        """Open a streaming connection to the backend.
+
+        Returns the raw response object. Raises urllib.error.HTTPError on
+        error status codes before any data is consumed, allowing callers
+        to handle the error before committing to a StreamingResponse.
+        """
         req = self.post("/responses", body=params)
-        with self.send(req) as resp:
-            for raw_line in resp:
-                line = raw_line.decode().strip()
-                if not line or line.startswith("event:"):
+
+        return self.send(req)
+
+    @staticmethod
+    def iter_stream_events(resp: t.IO[bytes]) -> Iterator[StreamEvent]:
+        for raw_line in resp:
+            line = raw_line.decode().strip()
+            if not line or line.startswith("event:"):
+                continue
+
+            if line.startswith("data: "):
+                payload = line[6:]
+                if payload == "[DONE]":
+                    break
+
+                try:
+                    data = json.loads(payload)
+                except json.JSONDecodeError:
+                    logger.warning("Skipping malformed SSE data: %s", payload[:120])
                     continue
 
-                if line.startswith("data: "):
-                    payload = line[6:]
-                    if payload == "[DONE]":
-                        break
+                event = parse_stream_event(data)
+                if event is not None:
+                    yield event
 
-                    try:
-                        data = json.loads(payload)
-                    except json.JSONDecodeError:
-                        logger.warning("Skipping malformed SSE data: %s", payload[:120])
-                        continue
-
-                    event = parse_stream_event(data)
-                    if event is not None:
-                        yield event
+    def stream_response(self, **params) -> Iterator[StreamEvent]:
+        with self.open_stream(**params) as resp:
+            yield from self.iter_stream_events(resp)
 
 
 @router.post("/chat/completions", response_model_exclude_none=True)
@@ -126,11 +149,14 @@ async def chat_completions(
 ):
     params = translate_request(data)
     if data.stream:
-        stream = client.stream_response(**params)
+        resp = client.open_stream(**params)
 
         def generate():
-            for line in translate_stream(stream, data.model):
-                yield line
+            try:
+                for line in translate_stream(client.iter_stream_events(resp), data.model):
+                    yield line
+            finally:
+                resp.close()
 
         return StreamingResponse(generate(), media_type="text/event-stream")
 

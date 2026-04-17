@@ -190,7 +190,8 @@ class TestChatCompletions:
             ),
         ]
 
-        mock_backend.stream_response.return_value = iter(events)
+        mock_backend.open_stream.return_value = MagicMock()
+        mock_backend.iter_stream_events.return_value = iter(events)
 
         resp = test_client.post(
             "/v1/chat/completions",
@@ -210,6 +211,30 @@ class TestChatCompletions:
         # Check first data chunk has role
         first = json.loads(lines[0].removeprefix("data: "))
         assert first["choices"][0]["delta"]["role"] == "assistant"
+
+    def test_chat_completions_streaming_backend_error(self, test_client, mock_backend):
+        error_body = b'{"error": {"message": "Forbidden"}}'
+        mock_backend.open_stream.side_effect = urllib.error.HTTPError(
+            url="http://test/responses",
+            code=403,
+            msg="Forbidden",
+            hdrs=None,
+            fp=io.BytesIO(error_body),
+        )
+
+        resp = test_client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "rhel-lightspeed/vertex",
+                "messages": [{"role": "user", "content": "Hello"}],
+                "stream": True,
+            },
+        )
+        data = resp.json()
+
+        assert resp.status_code == 403
+        assert data["error"]["message"] == "Forbidden"
+        assert data["error"]["type"] == "api_error"
 
     def test_chat_completions_backend_error(self, test_client, mock_backend):
         error_body = b'{"error": {"message": "Model not found"}}'

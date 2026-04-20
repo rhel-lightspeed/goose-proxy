@@ -36,6 +36,11 @@ Requires:       python3-tomli
 # Sphinx is used to build the manpages for the project.
 BuildRequires:  python3-sphinx
 
+# Third-party runtime dependencies used by goose-proxy
+Provides:       bundled(fastapi)
+Provides:       bundled(uvicorn)
+Provides:       bundled(pydantic)
+
 %global _description %{expand:
 A lightweight API translation proxy that bridges Goose with backend servers
 that speak the Responses API from OpenAI, such as Lightspeed Stack.}

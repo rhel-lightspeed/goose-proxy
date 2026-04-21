@@ -92,6 +92,7 @@ class BackendClient:
             headers={
                 "Accept": "application/json",
                 "X-LCS-Merge-Server-Tools": "true",
+                "User-Agent": "goose-proxy",
             },
         )
 

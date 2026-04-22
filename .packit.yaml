@@ -41,6 +41,8 @@ jobs:
       # packit uses the tarball generated above instead of downloading it.
       fix-spec-file:
         - "sed -i 's|^Source1:.*|Source1: vendor-wheels.tar.gz|' packaging/goose-proxy.spec"
+        # Update Release with Packit's generated value (includes PR identifier).
+        - "bash -c 'sed -i -r \"s/Release:(\\s*).*/Release:\\1${PACKIT_RPMSPEC_RELEASE}%{?dist}/\" packaging/goose-proxy.spec'"
       # Do not get the version from a tag (git describe) but from the spec file.
       get-current-version: &get_version
         - grep -oP '^Version:\s+\K\S+' packaging/goose-proxy.spec
@@ -60,4 +62,6 @@ jobs:
         - "sed -i 's|^Source1:.*|Source1: vendor-wheels.tar.gz|' packaging/goose-proxy.spec"
         # Bump release so main builds have higher NVR than PR builds.
         - rpmdev-bumpspec --comment='latest upstream build' ./packaging/goose-proxy.spec
+        # Update Release with Packit's generated value (includes branch and commit info).
+        - "bash -c 'sed -i -r \"s/Release:(\\s*).*/Release:\\1${PACKIT_RPMSPEC_RELEASE}%{?dist}/\" packaging/goose-proxy.spec'"
       get-current-version: *get_version

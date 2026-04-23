@@ -44,11 +44,15 @@ corenet_tcp_bind_generic_node(goose_proxy_t)
 
 # ------ Network: outbound (mTLS to backend + optional HTTP proxy) ------
 
-# http_port_t covers both 80 and 443, so this single macro allows the
-# backend HTTPS endpoint and any HTTP forward proxy on standard ports.
+# http_port_t covers 80 and 443 (backend HTTPS + standard HTTP proxies).
 corenet_tcp_connect_http_port(goose_proxy_t)
-# Common cache/proxy ports (8080, 8443, 3128, etc.) for forward proxies.
+# http_cache_port_t covers 8080, 8118, 8123, etc.
 corenet_tcp_connect_http_cache_port(goose_proxy_t)
+# squid_port_t covers 3128 (Squid proxy).
+corenet_tcp_connect_squid_port(goose_proxy_t)
+# transproxy_port_t covers the 8081
+corenet_tcp_connect_transproxy_port(goose_proxy_t)
+
 corenet_sendrecv_generic_client_packets(goose_proxy_t)
 corenet_tcp_sendrecv_generic_if(goose_proxy_t)
 corenet_tcp_sendrecv_generic_node(goose_proxy_t)

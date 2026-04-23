@@ -34,6 +34,7 @@ BuildRequires:  python3-devel
 BuildRequires:  python3-pip
 BuildRequires:  python3-setuptools
 BuildRequires:  python3-wheel
+BuildRequires:  pyproject-rpm-macros
 BuildRequires:  systemd-rpm-macros
 
 # Not needed after RHEL 10 as it is native in Python 3.11+
@@ -92,7 +93,7 @@ tar xzf %{SOURCE1}
     -r vendor_wheels/requirements-%{python3_version_nodots}.txt
 
 %build
-%py3_build_wheel
+%pyproject_wheel
 
 # Build the manpages
 sphinx-build -b man docs/man docs/build/man
@@ -101,7 +102,8 @@ sphinx-build -b man docs/man docs/build/man
 %{__make} -C data/release/selinux %{modulename}.pp.bz2
 
 %install
-%py3_install_wheel %{python_package_src}-%{version}-py3-none-any.whl
+%pyproject_install
+%pyproject_save_files %{python_package_src}
 
 # Install the manpages for goose-proxy and goose-proxy-config
 %{__install} -D -m 0644 docs/build/man/%{name}-config.5 %{buildroot}%{_mandir}/man5/%{name}-config.5
@@ -146,13 +148,11 @@ fi
 %postun
 %systemd_postun_with_restart %{name}.socket %{name}.service
 
-%files
+%files -f %{pyproject_files}
 %license LICENSE
 %doc README.md
 
 %{_bindir}/goose-proxy
-%{python3_sitelib}/%{python_package_src}/
-%{python3_sitelib}/%{python_package_src}-%{version}.dist-info/
 
 # Manpages
 %{_mandir}/man5/%{name}-config.5*

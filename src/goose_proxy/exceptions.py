@@ -11,6 +11,14 @@ from fastapi.responses import JSONResponse
 logger = logging.getLogger("uvicorn.error")
 
 
+class GooseProxyError(Exception):
+    """Base exception for all goose-proxy errors."""
+
+
+class CertificateInitializationError(GooseProxyError):
+    """Raised when backend certificate initialization fails."""
+
+
 def _openai_error_response(status_code: int, message: str, error_type: str) -> JSONResponse:
     """Build an OpenAI-compatible error response."""
     return JSONResponse(
@@ -73,7 +81,23 @@ def _url_error_handler(_: Request, exc: Exception) -> JSONResponse:
     )
 
 
+def _cert_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, CertificateInitializationError)
+
+    logger.debug("Certificate error: %s", exc.__cause__)
+
+    return _openai_error_response(
+        status_code=502,
+        message=(
+            "System is not registered. Failed to initialize certificate authentication. "
+            "Register this system with 'subscription-manager register' and try again."
+        ),
+        error_type="server_error",
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(HTTPException, _http_exception_handler)
     app.add_exception_handler(urllib.error.HTTPError, _http_error_handler)
     app.add_exception_handler(urllib.error.URLError, _url_error_handler)
+    app.add_exception_handler(CertificateInitializationError, _cert_error_handler)

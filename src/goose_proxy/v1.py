@@ -13,6 +13,7 @@ from fastapi import Request
 from fastapi.responses import StreamingResponse
 
 from goose_proxy.config import get_settings
+from goose_proxy.exceptions import CertificateInitializationError
 from goose_proxy.models.chat import ChatCompletionRequest
 from goose_proxy.models.chat import ModelInfo
 from goose_proxy.models.chat import ModelsResponse
@@ -81,7 +82,10 @@ class BackendClient:
         backend = settings.backend
 
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        ctx.load_cert_chain(str(backend.auth.cert_file), str(backend.auth.key_file))
+        try:
+            ctx.load_cert_chain(str(backend.auth.cert_file), str(backend.auth.key_file))
+        except (FileNotFoundError, ssl.SSLError) as err:
+            raise CertificateInitializationError() from err
         ctx.load_default_certs()
 
         client = cls(

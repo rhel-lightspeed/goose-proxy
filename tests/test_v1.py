@@ -2,13 +2,18 @@ import io
 import json
 import urllib.error
 
+from pathlib import Path
 from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
 from fastapi.testclient import TestClient
 
 from goose_proxy.app import app
+from goose_proxy.config import Auth
+from goose_proxy.config import Backend
+from goose_proxy.config import Settings
 from goose_proxy.models.responses import Response
 from goose_proxy.models.responses import ResponseCompletedEvent
 from goose_proxy.models.responses import ResponseCreatedEvent
@@ -266,6 +271,33 @@ class TestChatCompletions:
         )
 
         assert resp.status_code == 422
+
+    def test_chat_completions_missing_certificates(self, test_client):
+        fake_settings = Settings(
+            backend=Backend(
+                auth=Auth(
+                    cert_file=Path("/nonexistent/cert.pem"),
+                    key_file=Path("/nonexistent/key.pem"),
+                ),
+            ),
+        )
+
+        with patch("goose_proxy.v1.get_settings", return_value=fake_settings):
+            app.dependency_overrides.pop(BackendClient.create, None)
+
+            resp = test_client.post(
+                "/v1/chat/completions",
+                json={
+                    "model": "rhel-lightspeed/vertex",
+                    "messages": [{"role": "user", "content": "Hello"}],
+                },
+            )
+
+        data = resp.json()
+
+        assert resp.status_code == 502
+        assert "System is not registered" in data["error"]["message"]
+        assert "subscription-manager register" in data["error"]["message"]
 
 
 # --- Models endpoint ---

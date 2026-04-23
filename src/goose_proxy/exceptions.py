@@ -93,5 +93,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(HTTPException, _http_exception_handler)
     app.add_exception_handler(urllib.error.HTTPError, _http_error_handler)
     app.add_exception_handler(urllib.error.URLError, _url_error_handler)
+    # The only file reads at request time are the RHSM cert/key files, so a
+    # FileNotFoundError here means the system is not registered.
     app.add_exception_handler(FileNotFoundError, _cert_error_handler)
     app.add_exception_handler(ssl.SSLError, _cert_error_handler)

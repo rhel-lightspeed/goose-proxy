@@ -13,6 +13,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 OUTPUT="${OUTPUT:-$PROJECT_ROOT/packaging/vendor-wheels.tar.gz}"
 
 PYTHON_VERSIONS=("3.9" "3.12")
+ARCHES=("x86_64" "aarch64" "s390x" "ppc64le")
 
 cd "$PROJECT_ROOT"
 
@@ -21,7 +22,7 @@ rm -rf vendor_wheels
 mkdir -p vendor_wheels
 mkdir -p "$(dirname "$OUTPUT")"
 
-for python_version in "${PYTHON_VERSIONS[@]}" 
+for python_version in "${PYTHON_VERSIONS[@]}"
 do
     # Resolve dependencies for each target Python version. Python 3.9 (RHEL 9)
     # and 3.12 (RHEL 10) have different dependency constraints (e.g. typer
@@ -33,19 +34,21 @@ do
         --no-header --no-annotate \
         -o "requirements-${python_version/./}.txt"
 
-    for attempt in 1 2 3
+    for arch in "${ARCHES[@]}"
     do
-        # Download binary wheels for each Python version. --no-deps is required
-        # because pip evaluates environment markers using the host Python, not
-        # the target version set by --python-version, causing false dependency
-        # conflicts. In case of pip download fail to execute, we will retry 3
-        # times with a wait time of 5 seconds between retries.
-        pip3 download --no-deps --dest vendor_wheels --only-binary=:all: \
-            --python-version ${python_version} --abi cp${python_version/./} --implementation cp \
-            --platform manylinux_2_17_x86_64 --platform manylinux_2_28_x86_64 \
-            -r "requirements-${python_version/./}.txt" && break
-        echo "Attempt ${attempt} failed. Retrying..."
-        sleep 5
+        for attempt in 1 2 3
+        do
+            # Download binary wheels for each Python version and architecture.
+            # --no-deps is required because pip evaluates environment markers
+            # using the host Python, not the target version set by
+            # --python-version, causing false dependency conflicts.
+            pip3 download --no-deps --dest vendor_wheels --only-binary=:all: \
+                --python-version ${python_version} --abi cp${python_version/./} --implementation cp \
+                --platform "manylinux_2_17_${arch}" --platform "manylinux_2_28_${arch}" \
+                -r "requirements-${python_version/./}.txt" && break
+            echo "Attempt ${attempt} for ${arch} failed. Retrying..."
+            sleep 5
+        done
     done
 
     # Bundle requirements files so the spec can select the right one at build

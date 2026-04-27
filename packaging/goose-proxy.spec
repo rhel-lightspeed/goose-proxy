@@ -14,7 +14,7 @@
 %define modulename goose_proxy
 
 Name:           goose-proxy
-Version:        0.1.0
+Version:        1.0.0
 Release:        1%{?dist}
 Summary:        A proxy API for RHEL command line assistant
 

@@ -61,3 +61,46 @@ jobs:
         - "bash -c 'sed -i -r \"s/Release:(\\s*).*/Release:\\1${PACKIT_RPMSPEC_RELEASE}%{?dist}/\" packaging/goose-proxy.spec'"
       get-current-version:
         - grep -oP '^Version:\s+\K\S+' packaging/goose-proxy.spec
+
+  # Run internal test suite on Testing Farm (Red Hat ranch)
+  - job: tests
+    trigger: pull_request
+    fmf_url: "https://gitlab.cee.redhat.com/rhel-lightspeed/enhanced-shell/goose-tests"
+    fmf_ref: "main"
+    use_internal_tf: True
+    # Note: tf_post_install_script does not work https://redhat.atlassian.net/browse/TFT-3104
+    #tf_post_install_script: "script"
+    identifier: goose-tests-rhel10
+    targets:
+      rhel-10-x86_64:
+        distros:
+          - RHEL-10.2-Nightly
+          - RHEL-10.3-Nightly
+      rhel-9-x86_64:
+        distros:
+          - RHEL-9.8.0-Nightly
+          - RHEL-9.9.0-Nightly
+      # FIXME: Missing copr builds for other architectures
+      # rhel-10-aarch64:
+      #   distros:
+      #     - RHEL-10.2-Nightly
+      #     - RHEL-10.3-Nightly
+      # rhel-10-s390x:
+      #   distros:
+      #     - RHEL-10.2-Nightly
+      #     - RHEL-10.3-Nightly
+      # rhel-10-ppc64le:
+      #   distros:
+      #     - RHEL-10.2-Nightly
+      #     - RHEL-10.3-Nightly
+    tf_extra_params:
+      environments:
+        # We need to enable the goose (stock) copr repository to be able to install goose-redhat on RHEL
+        - artifacts:
+            - id: "https://raw.githubusercontent.com/kokesak/goose-stock-repo-file/refs/heads/main/goose-copr.repo"
+              type: repository-file
+              install: false
+          settings:
+            provisioning:
+              tags:
+                BusinessUnit: rhel_sst_lightspeed@upstream

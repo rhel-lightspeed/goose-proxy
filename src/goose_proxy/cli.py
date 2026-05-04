@@ -8,7 +8,6 @@ import uvicorn
 
 from pydantic import ValidationError
 
-from goose_proxy.app import app
 from goose_proxy.config import get_settings
 from goose_proxy.config import tomllib
 
@@ -50,14 +49,14 @@ def serve():
             logger.warning("The 'reload' setting is ignored under systemd socket activation.")
 
         uvicorn.run(
-            app,
+            "goose_proxy.app:app",
             fd=SD_LISTEN_FDS_START,
             workers=settings.server.workers,
             log_level=settings.logging.level.lower(),
         )
     else:
         uvicorn.run(
-            "goose_proxy.app:app" if settings.server.reload else app,
+            "goose_proxy.app:app",
             host=settings.server.host,
             port=settings.server.port,
             reload=settings.server.reload,

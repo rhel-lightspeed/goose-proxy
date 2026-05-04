@@ -12,7 +12,13 @@ from goose_proxy.cli import SD_LISTEN_FDS_START
 
 @pytest.fixture
 def mock_uvicorn():
+    def mock_run(*args, **kwargs):
+        if kwargs.get("reload") or kwargs.get("workers", 1) > 1:
+            if not isinstance(args[0], str):
+                raise ValueError("You must pass the application as an import string to enable 'reload' or 'workers'.")
+
     with patch("goose_proxy.cli.uvicorn", autospec=True) as mock_uvicorn:
+        mock_uvicorn.run.side_effect = mock_run
         yield mock_uvicorn
 
 

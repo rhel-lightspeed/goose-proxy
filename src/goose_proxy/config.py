@@ -126,7 +126,7 @@ class Server(BaseModel):
     host: str = "127.0.0.1"
     port: int = 7080
     reload: bool = False
-    workers: int = 1
+    workers: int = 4
 
 
 class Settings(BaseModel):

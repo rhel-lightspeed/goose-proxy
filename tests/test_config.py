@@ -77,7 +77,7 @@ class TestServer:
         assert s.host == "127.0.0.1"
         assert s.port == 7080
         assert s.reload is False
-        assert s.workers == 1
+        assert s.workers == 4
 
     def test_custom_values(self):
         s = Server(host="0.0.0.0", port=9090, reload=True, workers=4)

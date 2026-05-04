@@ -51,7 +51,7 @@ Settings that control the HTTP server (uvicorn).
 
 ``workers`` = *integer*
     Number of uvicorn worker processes.
-    **Default:** ``1``
+    **Default:** ``4``
 
 [backend]
 ---------

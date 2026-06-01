@@ -1,6 +1,7 @@
-import json
 import logging
-import urllib.error
+import typing as t
+
+import openai
 
 from fastapi import FastAPI
 from fastapi import HTTPException
@@ -43,40 +44,28 @@ def _http_exception_handler(_: Request, exc: Exception) -> JSONResponse:
     )
 
 
-def _http_error_handler(_: Request, exc: Exception) -> JSONResponse:
-    assert isinstance(exc, urllib.error.HTTPError)
-    body = exc.read().decode()
-
-    logger.debug(
-        "Backend HTTP error\n\tURL: %s\n\tResponse status: %s %s\n\tResponse headers: %s\n\tResponse body: %s",
-        exc.url,
-        exc.code,
-        exc.reason,
-        dict(exc.headers) if exc.headers else {},
-        body,
-    )
-
-    try:
-        data = json.loads(body)
-        message = data.get("error", {}).get("message", str(exc))
-    except (json.JSONDecodeError, ValueError):
-        message = body or str(exc)
+def _api_status_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, openai.APIStatusError)
+    message = str(exc)
+    body = t.cast(dict[str, t.Any], exc.body) if isinstance(exc.body, dict) else None
+    if body:
+        error_info = body.get("error")
+        if isinstance(error_info, dict) and "message" in error_info:
+            message = error_info["message"]
 
     return _openai_error_response(
-        status_code=exc.code,
+        status_code=exc.status_code,
         message=message,
         error_type="api_error",
     )
 
 
-def _url_error_handler(_: Request, exc: Exception) -> JSONResponse:
-    assert isinstance(exc, urllib.error.URLError)
-
-    logger.debug("Backend connection error: %s", exc.reason)
+def _api_connection_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, openai.APIConnectionError)
 
     return _openai_error_response(
         status_code=502,
-        message=str(exc.reason),
+        message=exc.message,
         error_type="api_error",
     )
 
@@ -98,6 +87,6 @@ def _cert_error_handler(_: Request, exc: Exception) -> JSONResponse:
 
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(HTTPException, _http_exception_handler)
-    app.add_exception_handler(urllib.error.HTTPError, _http_error_handler)
-    app.add_exception_handler(urllib.error.URLError, _url_error_handler)
+    app.add_exception_handler(openai.APIStatusError, _api_status_error_handler)
+    app.add_exception_handler(openai.APIConnectionError, _api_connection_error_handler)
     app.add_exception_handler(CertificateInitializationError, _cert_error_handler)

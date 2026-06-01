@@ -2,11 +2,12 @@
 
 import pytest
 
-from goose_proxy.models.responses import Response
-from goose_proxy.models.responses import ResponseFunctionToolCall
-from goose_proxy.models.responses import ResponseOutputMessage
-from goose_proxy.models.responses import ResponseOutputText
-from goose_proxy.models.responses import ResponseUsage
+from openai.types.responses import Response
+from openai.types.responses import ResponseFunctionToolCall
+from openai.types.responses import ResponseOutputMessage
+from openai.types.responses import ResponseOutputText
+from openai.types.responses import ResponseUsage
+
 from goose_proxy.translators.response import translate_response
 
 
@@ -15,6 +16,8 @@ def _make_usage(input_tokens=10, output_tokens=5, total_tokens=15):
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         total_tokens=total_tokens,
+        input_tokens_details={"cached_tokens": 0},
+        output_tokens_details={"reasoning_tokens": 0},
     )
 
 
@@ -25,6 +28,9 @@ def _make_response(output=None, usage=None, status="completed", response_id="res
         model="rhel-lightspeed/vertex",
         object="response",
         output=output or [],
+        parallel_tool_calls=True,
+        tool_choice="auto",
+        tools=[],
         status=status,
         usage=usage,
     )

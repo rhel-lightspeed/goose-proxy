@@ -1,28 +1,29 @@
-import io
 import json
-import urllib.error
 
 from pathlib import Path
+from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
+import httpx
+import openai
 import pytest
 
 from fastapi.testclient import TestClient
+from openai.types.responses import Response
+from openai.types.responses import ResponseCompletedEvent
+from openai.types.responses import ResponseCreatedEvent
+from openai.types.responses import ResponseFunctionToolCall
+from openai.types.responses import ResponseOutputMessage
+from openai.types.responses import ResponseOutputText
+from openai.types.responses import ResponseTextDeltaEvent
+from openai.types.responses import ResponseUsage
 
 from goose_proxy.app import app
 from goose_proxy.config import Auth
 from goose_proxy.config import Backend
 from goose_proxy.config import Settings
-from goose_proxy.models.responses import Response
-from goose_proxy.models.responses import ResponseCompletedEvent
-from goose_proxy.models.responses import ResponseCreatedEvent
-from goose_proxy.models.responses import ResponseFunctionToolCall
-from goose_proxy.models.responses import ResponseOutputMessage
-from goose_proxy.models.responses import ResponseOutputText
-from goose_proxy.models.responses import ResponseTextDeltaEvent
-from goose_proxy.models.responses import ResponseUsage
-from goose_proxy.v1 import BackendClient
+from goose_proxy.v1 import get_openai_client
 
 
 def _make_usage():
@@ -30,6 +31,8 @@ def _make_usage():
         input_tokens=10,
         output_tokens=5,
         total_tokens=15,
+        input_tokens_details={"cached_tokens": 0},
+        output_tokens_details={"reasoning_tokens": 0},
     )
 
 
@@ -48,6 +51,9 @@ def _make_text_response():
                 type="message",
             )
         ],
+        parallel_tool_calls=True,
+        tool_choice="auto",
+        tools=[],
         status="completed",
         usage=_make_usage(),
     )
@@ -69,25 +75,29 @@ def _make_tool_call_response():
                 status="completed",
             )
         ],
+        parallel_tool_calls=True,
+        tool_choice="auto",
+        tools=[],
         status="completed",
         usage=_make_usage(),
     )
 
 
 @pytest.fixture
-def test_client():
-    return TestClient(app)
+def mock_openai_client():
+    """Create a mock AsyncOpenAI client."""
+    client = MagicMock()
+    client.responses = MagicMock()
+    client.responses.create = AsyncMock()
+    return client
 
 
 @pytest.fixture
-def mock_backend():
-    mock = MagicMock()
+def test_client(mock_openai_client):
+    """FastAPI test client with mocked OpenAI dependency."""
+    app.dependency_overrides[get_openai_client] = lambda: mock_openai_client
 
-    def _mock_backend():
-        return mock
-
-    app.dependency_overrides[BackendClient.create] = _mock_backend
-    yield mock
+    yield TestClient(app)
 
     app.dependency_overrides.clear()
 
@@ -106,9 +116,8 @@ def tool_call_response_fixture():
 
 
 class TestChatCompletions:
-    def test_chat_completions_success(self, test_client, mock_backend, text_response_fixture):
-        mock_backend.create_response.return_value = text_response_fixture
-
+    def test_chat_completions_success(self, test_client, mock_openai_client, text_response_fixture):
+        mock_openai_client.responses.create.return_value = text_response_fixture
         resp = test_client.post(
             "/v1/chat/completions",
             json={
@@ -116,16 +125,15 @@ class TestChatCompletions:
                 "messages": [{"role": "user", "content": "Hello"}],
             },
         )
+        assert resp.status_code == 200
         data = resp.json()
 
-        assert resp.status_code == 200
         assert data["object"] == "chat.completion"
         assert data["choices"][0]["message"]["content"] == "Hello!"
         assert data["choices"][0]["finish_reason"] == "stop"
 
-    def test_chat_completions_with_tools(self, test_client, mock_backend, tool_call_response_fixture):
-        mock_backend.create_response.return_value = tool_call_response_fixture
-
+    def test_chat_completions_with_tools(self, test_client, mock_openai_client, tool_call_response_fixture):
+        mock_openai_client.responses.create.return_value = tool_call_response_fixture
         resp = test_client.post(
             "/v1/chat/completions",
             json={
@@ -143,29 +151,26 @@ class TestChatCompletions:
                 ],
             },
         )
+        assert resp.status_code == 200
         data = resp.json()
         tc = data["choices"][0]["message"]["tool_calls"]
 
-        assert resp.status_code == 200
         assert data["choices"][0]["finish_reason"] == "tool_calls"
         assert len(tc) == 1
         assert tc[0]["function"]["name"] == "get_weather"
 
-    def test_chat_completions_streaming(self, test_client, mock_backend):
+    def test_chat_completions_streaming(self, test_client, mock_openai_client):
         base_resp = Response(
             id="resp_stream",
             created_at=1700000000,
             model="rhel-lightspeed/vertex",
             object="response",
             output=[],
+            parallel_tool_calls=True,
+            tool_choice="auto",
+            tools=[],
             status="in_progress",
             usage=None,
-        )
-
-        usage = ResponseUsage(
-            input_tokens=10,
-            output_tokens=2,
-            total_tokens=12,
         )
 
         completed_resp = Response(
@@ -174,8 +179,11 @@ class TestChatCompletions:
             model="rhel-lightspeed/vertex",
             object="response",
             output=[],
+            parallel_tool_calls=True,
+            tool_choice="auto",
+            tools=[],
             status="completed",
-            usage=usage,
+            usage=_make_usage(),
         )
 
         events = [
@@ -187,6 +195,7 @@ class TestChatCompletions:
                 output_index=0,
                 sequence_number=1,
                 type="response.output_text.delta",
+                logprobs=[],
             ),
             ResponseCompletedEvent(
                 response=completed_resp,
@@ -195,8 +204,11 @@ class TestChatCompletions:
             ),
         ]
 
-        mock_backend.open_stream.return_value = MagicMock()
-        mock_backend.iter_stream_events.return_value = iter(events)
+        async def mock_stream_iter():
+            for e in events:
+                yield e
+
+        mock_openai_client.responses.create.return_value = mock_stream_iter()
 
         resp = test_client.post(
             "/v1/chat/completions",
@@ -206,10 +218,9 @@ class TestChatCompletions:
                 "stream": True,
             },
         )
-        lines = [line for line in resp.text.split("\n\n") if line.strip()]
-
         assert resp.status_code == 200
         assert "text/event-stream" in resp.headers["content-type"]
+        lines = [line for line in resp.text.split("\n\n") if line.strip()]
         assert len(lines) >= 3  # role + text + completed + [DONE]
         assert lines[-1].strip() == "data: [DONE]"
 
@@ -217,41 +228,17 @@ class TestChatCompletions:
         first = json.loads(lines[0].removeprefix("data: "))
         assert first["choices"][0]["delta"]["role"] == "assistant"
 
-    def test_chat_completions_streaming_backend_error(self, test_client, mock_backend):
-        error_body = b'{"error": {"message": "Forbidden"}}'
-        mock_backend.open_stream.side_effect = urllib.error.HTTPError(
-            url="http://test/responses",
-            code=403,
-            msg="Forbidden",
-            hdrs=None,
-            fp=io.BytesIO(error_body),
+    def test_chat_completions_backend_error(self, test_client, mock_openai_client):
+        error_response = httpx.Response(
+            status_code=404,
+            json={"error": {"message": "Model not found"}},
+            request=httpx.Request("POST", "http://test"),
         )
-
-        resp = test_client.post(
-            "/v1/chat/completions",
-            json={
-                "model": "rhel-lightspeed/vertex",
-                "messages": [{"role": "user", "content": "Hello"}],
-                "stream": True,
-            },
+        mock_openai_client.responses.create.side_effect = openai.NotFoundError(
+            message="Not Found",
+            response=error_response,
+            body={"error": {"message": "Model not found"}},
         )
-        data = resp.json()
-
-        assert resp.status_code == 403
-        assert data["error"]["message"] == "Forbidden"
-        assert data["error"]["type"] == "api_error"
-
-    def test_chat_completions_backend_error(self, test_client, mock_backend):
-        error_body = b'{"error": {"message": "Model not found"}}'
-        exc = urllib.error.HTTPError(
-            url="http://test/responses",
-            code=404,
-            msg="Not Found",
-            hdrs=None,
-            fp=io.BytesIO(error_body),
-        )
-        mock_backend.create_response.side_effect = exc
-
         resp = test_client.post(
             "/v1/chat/completions",
             json={
@@ -259,12 +246,12 @@ class TestChatCompletions:
                 "messages": [{"role": "user", "content": "Hi"}],
             },
         )
+        assert resp.status_code == 404
         data = resp.json()
 
-        assert resp.status_code == 404
         assert data["error"]["message"] == "Model not found"
 
-    def test_chat_completions_invalid_request(self, test_client, mock_backend):
+    def test_chat_completions_invalid_request(self, test_client):
         resp = test_client.post(
             "/v1/chat/completions",
             json={"messages": [{"role": "user", "content": "Hi"}]},
@@ -283,7 +270,8 @@ class TestChatCompletions:
         )
 
         with patch("goose_proxy.v1.get_settings", return_value=fake_settings):
-            app.dependency_overrides.pop(BackendClient.create, None)
+            get_openai_client.cache_clear()
+            app.dependency_overrides.pop(get_openai_client, None)
 
             resp = test_client.post(
                 "/v1/chat/completions",

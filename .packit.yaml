@@ -66,11 +66,12 @@ jobs:
   - job: tests
     trigger: pull_request
     fmf_url: "https://gitlab.cee.redhat.com/rhel-lightspeed/enhanced-shell/goose-tests"
-    fmf_ref: "main"
+    fmf_ref: "develop"
     use_internal_tf: True
     # Note: tf_post_install_script does not work https://redhat.atlassian.net/browse/TFT-3104
     #tf_post_install_script: "script"
-    identifier: goose-tests-rhel10
+    identifier: goose-tests
+    tmt_plan: "level0"
     targets:
       rhel-10-x86_64:
         distros:
@@ -80,19 +81,6 @@ jobs:
         distros:
           - RHEL-9.8.0-Nightly
           - RHEL-9.9.0-Nightly
-      # FIXME: Missing copr builds for other architectures
-      # rhel-10-aarch64:
-      #   distros:
-      #     - RHEL-10.2-Nightly
-      #     - RHEL-10.3-Nightly
-      # rhel-10-s390x:
-      #   distros:
-      #     - RHEL-10.2-Nightly
-      #     - RHEL-10.3-Nightly
-      # rhel-10-ppc64le:
-      #   distros:
-      #     - RHEL-10.2-Nightly
-      #     - RHEL-10.3-Nightly
     tf_extra_params:
       environments:
         # We need to enable the goose (stock) copr repository to be able to install goose-redhat on RHEL

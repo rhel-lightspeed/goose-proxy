@@ -2,6 +2,7 @@
 
 from goose_proxy.models.responses import parse_stream_event
 from goose_proxy.models.responses import Response
+from goose_proxy.models.responses import ResponseOutputMessage
 
 
 class TestResponseDropUnknownOutputTypes:
@@ -191,6 +192,72 @@ class TestParseStreamEvent:
         data = {"foo": "bar"}
         event = parse_stream_event(data)
         assert event is None
+
+    def test_output_item_added_shield_blocked_message(self):
+        """Shield-blocked refusal messages have string content and no id/status.
+
+        LCS 0.7.0rc3+ emits response.output_item.added with a message item whose
+        content is a bare string and whose id and status fields are absent.  The
+        proxy must parse this without raising a ValidationError.
+        """
+        data = {
+            "type": "response.output_item.added",
+            "item": {
+                "type": "message",
+                "role": "assistant",
+                "content": "Your input contains characters or encoding patterns that cannot be processed. Please rephrase your question in plain text.",
+            },
+            "output_index": 0,
+            "sequence_number": 1,
+        }
+        event = parse_stream_event(data)
+        assert event is not None
+        assert event.type == "response.output_item.added"
+        assert event.item.type == "message"
+        assert event.item.id is None
+        assert event.item.status is None
+        assert len(event.item.content) == 1
+        assert event.item.content[0].type == "output_text"
+        assert "cannot be processed" in event.item.content[0].text
+
+
+class TestResponseOutputMessage:
+    def test_normal_message_with_list_content(self):
+        """Normal LLM response messages have list content, id, and status."""
+        msg = ResponseOutputMessage(
+            id="msg_1",
+            content=[{"type": "output_text", "text": "Hello!", "annotations": []}],
+            role="assistant",
+            status="completed",
+        )
+        assert msg.id == "msg_1"
+        assert msg.status == "completed"
+        assert len(msg.content) == 1
+        assert msg.content[0].text == "Hello!"
+
+    def test_shield_blocked_message_with_string_content(self):
+        """Shield-blocked messages use a bare string for content, no id or status."""
+        msg = ResponseOutputMessage(
+            role="assistant",
+            content="Your input contains characters or encoding patterns that cannot be processed.",
+        )
+        assert msg.id is None
+        assert msg.status is None
+        assert len(msg.content) == 1
+        assert msg.content[0].type == "output_text"
+        assert "cannot be processed" in msg.content[0].text
+
+    def test_empty_string_content_coerced(self):
+        """Empty string content is coerced to a single output_text with empty text."""
+        msg = ResponseOutputMessage(role="assistant", content="")
+        assert len(msg.content) == 1
+        assert msg.content[0].text == ""
+
+    def test_id_and_status_optional(self):
+        """id and status are optional — absence must not raise ValidationError."""
+        msg = ResponseOutputMessage(role="assistant", content=[])
+        assert msg.id is None
+        assert msg.status is None
 
     def test_response_completed(self):
         data = {

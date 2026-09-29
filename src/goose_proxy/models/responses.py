@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import field_validator
+from pydantic import model_validator
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -27,12 +28,31 @@ class ResponseOutputText(BaseModel):
 
 class ResponseOutputMessage(BaseModel):
     type: t.Literal["message"] = "message"
-    id: str
-    content: list[ResponseOutputText]
+    # id and status are required on normal LLM response messages but are absent
+    # on shield-blocked refusal messages emitted by LCS (LCORE-4xxx / 0.7.0rc3+).
+    # Treat them as optional so the proxy can parse and forward both shapes.
+    id: t.Optional[str] = None
+    content: t.Union[list[ResponseOutputText], str]
     role: str
-    status: str
+    status: t.Optional[str] = None
 
     model_config = ConfigDict(extra="ignore")
+
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_string_content(cls, values: t.Any) -> t.Any:
+        """Coerce a bare-string content field into a single-element output_text list.
+
+        LCS shield-blocked refusal messages set ``content`` to a plain string
+        rather than a list of typed content parts.  This validator normalises
+        the shape so downstream translation code can always iterate over a list.
+        """
+        if isinstance(values, dict):
+            content = values.get("content")
+            if isinstance(content, str):
+                values = dict(values)
+                values["content"] = [{"type": "output_text", "text": content}]
+        return values
 
 
 class ResponseFunctionToolCall(BaseModel):

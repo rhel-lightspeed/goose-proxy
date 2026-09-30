@@ -52,6 +52,6 @@ clean-vendor: ## Remove all vendored packages, keeping only __init__.py
 
 .PHONY: request
 request: ## Make a test request to the v1 API
-	@curl -sX POST localhost:7080/v1/chat/completions \
+	@curl -sX POST localhost:7080/v1/responses \
 		-H "Content-Type: application/json" \
 		--data '{"model": "", "messages": [{"role": "user", "content": "How do I enable SSH root login on RHEL?"}], "stream": false}' | jq

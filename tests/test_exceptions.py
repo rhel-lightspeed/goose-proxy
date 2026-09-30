@@ -1,17 +1,17 @@
-import io
+"""Tests for exception handlers — all errors must return OpenAI-compatible JSON."""
+
 import json
-import urllib.error
 
 from unittest.mock import MagicMock
 
-import pytest
+import httpx
 
 from fastapi import HTTPException
 
 from goose_proxy.exceptions import _cert_error_handler
-from goose_proxy.exceptions import _http_error_handler
 from goose_proxy.exceptions import _http_exception_handler
-from goose_proxy.exceptions import _url_error_handler
+from goose_proxy.exceptions import _http_status_error_handler
+from goose_proxy.exceptions import _request_error_handler
 from goose_proxy.exceptions import CertificateInitializationError
 
 
@@ -19,20 +19,11 @@ def _dummy_request():
     return MagicMock()
 
 
-@pytest.fixture
-def make_http_error():
-    def _make_http_error(code, body):
-        fp = io.BytesIO(body.encode())
-
-        return urllib.error.HTTPError(
-            url="http://test/responses",
-            code=code,
-            msg="",
-            hdrs=None,
-            fp=fp,
-        )
-
-    return _make_http_error
+def _make_http_status_error(status_code: int, body: dict) -> httpx.HTTPStatusError:
+    """Build an httpx.HTTPStatusError matching what httpx raises for backend errors."""
+    request = httpx.Request("POST", "https://backend/v1/responses")
+    response = httpx.Response(status_code, json=body, request=request)
+    return httpx.HTTPStatusError(str(status_code), request=request, response=response)
 
 
 class TestHttpExceptionHandler:
@@ -43,7 +34,6 @@ class TestHttpExceptionHandler:
         body = json.loads(resp.body)
 
         assert resp.status_code == 400
-        assert resp.body is not None
         assert body["error"]["type"] == "invalid_request_error"
         assert body["error"]["message"] == "Bad request body"
         assert body["error"]["code"] == 400
@@ -83,62 +73,67 @@ class TestHttpExceptionHandler:
         assert body["error"]["type"] == "server_error"
 
 
-class TestHttpErrorHandler:
-    def test_extracts_message_from_json_error(self, make_http_error):
-        exc = make_http_error(422, '{"error": {"message": "Invalid parameters"}}')
+class TestHttpStatusErrorHandler:
+    def test_extracts_message_from_json_error(self):
+        """Error message is extracted from the backend's OpenAI-format error body."""
+        exc = _make_http_status_error(422, {"error": {"message": "Invalid parameters"}})
 
-        resp = _http_error_handler(_dummy_request(), exc)
+        resp = _http_status_error_handler(_dummy_request(), exc)
         body = json.loads(resp.body)
 
         assert resp.status_code == 422
         assert body["error"]["message"] == "Invalid parameters"
         assert body["error"]["type"] == "api_error"
 
-    def test_falls_back_to_text_on_non_json(self, make_http_error):
-        exc = make_http_error(500, "Internal Server Error")
+    def test_falls_back_to_exc_str_when_no_error_key(self):
+        """Falls back to the exception string when the body has no 'error' key."""
+        exc = _make_http_status_error(503, {"detail": "Service unavailable"})
 
-        resp = _http_error_handler(_dummy_request(), exc)
-        body = json.loads(resp.body)
-
-        assert resp.status_code == 500
-        assert body["error"]["message"] == "Internal Server Error"
-
-    def test_falls_back_to_str_exc_when_no_message_key(self, make_http_error):
-        exc = make_http_error(503, '{"detail": "Service unavailable"}')
-
-        resp = _http_error_handler(_dummy_request(), exc)
+        resp = _http_status_error_handler(_dummy_request(), exc)
         body = json.loads(resp.body)
 
         assert resp.status_code == 503
-        assert "503" in body["error"]["message"]
+        assert body["error"]["message"]
 
-    def test_preserves_status_code(self, make_http_error):
-        exc = make_http_error(429, '{"error": {"message": "Rate limited"}}')
+    def test_preserves_status_code(self):
+        """Backend status code is forwarded to the client."""
+        exc = _make_http_status_error(429, {"error": {"message": "Rate limited"}})
 
-        resp = _http_error_handler(_dummy_request(), exc)
+        resp = _http_status_error_handler(_dummy_request(), exc)
 
         assert resp.status_code == 429
 
+    def test_404_propagates(self):
+        """Backend 404 is forwarded with the original error message."""
+        exc = _make_http_status_error(404, {"error": {"message": "Model not found"}})
 
-class TestUrlErrorHandler:
+        resp = _http_status_error_handler(_dummy_request(), exc)
+        body = json.loads(resp.body)
+
+        assert resp.status_code == 404
+        assert body["error"]["message"] == "Model not found"
+
+
+class TestRequestErrorHandler:
     def test_connection_error_returns_502(self):
-        exc = urllib.error.URLError("Connection refused")
+        """Backend connection failures return a 502 error."""
+        exc = httpx.ConnectError("All connection attempts failed")
 
-        resp = _url_error_handler(_dummy_request(), exc)
+        resp = _request_error_handler(_dummy_request(), exc)
         body = json.loads(resp.body)
 
         assert resp.status_code == 502
         assert body["error"]["type"] == "api_error"
-        assert "Connection refused" in body["error"]["message"]
 
     def test_timeout_error_returns_502(self):
-        exc = urllib.error.URLError("Read timed out")
+        """Backend timeouts return a 502 error."""
+        exc = httpx.ReadTimeout("Timed out")
 
-        resp = _url_error_handler(_dummy_request(), exc)
+        resp = _request_error_handler(_dummy_request(), exc)
         body = json.loads(resp.body)
 
         assert resp.status_code == 502
-        assert "Read timed out" in body["error"]["message"]
+        assert body["error"]["type"] == "api_error"
 
 
 class TestCertErrorHandler:

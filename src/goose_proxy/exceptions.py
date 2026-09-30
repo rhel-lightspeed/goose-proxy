@@ -1,6 +1,6 @@
-import json
+"""Exception hierarchy and OpenAI-compatible error response builders."""
+
 import logging
-import urllib.error
 
 import httpx
 
@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
+
 class GooseProxyError(Exception):
     """Base exception for all goose-proxy errors."""
 
@@ -19,9 +20,11 @@ class GooseProxyError(Exception):
 class CertificateInitializationError(GooseProxyError):
     """Raised when backend certificate initialization fails."""
 
+
 def _invalid_url_handler(_: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, httpx.InvalidURL)
     return _openai_error_response(400, str(exc), "server_error")
+
 
 def _openai_error_response(status_code: int, message: str, error_type: str) -> JSONResponse:
     """Build an OpenAI-compatible error response."""
@@ -47,40 +50,40 @@ def _http_exception_handler(_: Request, exc: Exception) -> JSONResponse:
     )
 
 
-def _http_error_handler(_: Request, exc: Exception) -> JSONResponse:
-    assert isinstance(exc, urllib.error.HTTPError)
-    body = exc.read().decode()
+def _http_status_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    """Handle HTTP error responses from the backend (4xx/5xx)."""
+    assert isinstance(exc, httpx.HTTPStatusError)
 
-    logger.debug(
-        "Backend HTTP error\n\tURL: %s\n\tResponse status: %s %s\n\tResponse headers: %s\n\tResponse body: %s",
-        exc.url,
-        exc.code,
-        exc.reason,
-        dict(exc.headers) if exc.headers else {},
-        body,
+    status_code = exc.response.status_code
+    logger.warning(
+        "Backend HTTP error\n\tURL: %s\n\tStatus: %s\n\tBody: %s",
+        exc.request.url,
+        status_code,
+        exc.response.text,
     )
 
     try:
-        data = json.loads(body)
+        data = exc.response.json()
         message = data.get("error", {}).get("message", str(exc))
-    except (json.JSONDecodeError, ValueError):
-        message = body or str(exc)
+    except Exception:
+        message = exc.response.text or str(exc)
 
     return _openai_error_response(
-        status_code=exc.code,
+        status_code=status_code,
         message=message,
         error_type="api_error",
     )
 
 
-def _url_error_handler(_: Request, exc: Exception) -> JSONResponse:
-    assert isinstance(exc, urllib.error.URLError)
+def _request_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    """Handle connection and timeout failures (backend unreachable)."""
+    assert isinstance(exc, httpx.RequestError)
 
-    logger.debug("Backend connection error: %s", exc.reason)
+    logger.warning("Backend connection error: %s", exc)
 
     return _openai_error_response(
         status_code=502,
-        message=str(exc.reason),
+        message=str(exc),
         error_type="api_error",
     )
 
@@ -88,7 +91,7 @@ def _url_error_handler(_: Request, exc: Exception) -> JSONResponse:
 def _cert_error_handler(_: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, CertificateInitializationError)
 
-    logger.debug("Certificate error: %s", exc.__cause__)
+    logger.warning("Certificate error: %s", exc.__cause__)
 
     return _openai_error_response(
         status_code=502,
@@ -101,8 +104,9 @@ def _cert_error_handler(_: Request, exc: Exception) -> JSONResponse:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    """Register all exception handlers on the FastAPI application."""
     app.add_exception_handler(HTTPException, _http_exception_handler)
-    app.add_exception_handler(urllib.error.HTTPError, _http_error_handler)
-    app.add_exception_handler(urllib.error.URLError, _url_error_handler)
+    app.add_exception_handler(httpx.HTTPStatusError, _http_status_error_handler)
+    app.add_exception_handler(httpx.RequestError, _request_error_handler)
     app.add_exception_handler(httpx.InvalidURL, _invalid_url_handler)
     app.add_exception_handler(CertificateInitializationError, _cert_error_handler)

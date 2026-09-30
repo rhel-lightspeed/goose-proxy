@@ -5,7 +5,7 @@
     "description": "Inference provided by Red Hat with RHEL specific knowledge",
     "api_key_env": "",
     "base_url": "http://127.0.0.1:7080",
-    "base_path": "v1/chat/completions",
+    "base_path": "v1/responses",
     "models": [
         {
             "name": "RHEL-command-line-assistant",

@@ -32,6 +32,10 @@ sanity: lint type format
 man: ## Build man pages with Sphinx
 	uv run --locked sphinx-build -b man docs/man docs/build/man
 
+.PHONY: setup
+setup: ## Set up the development environment
+	uv sync --locked --group dev
+
 .PHONY: clean
 clean: ## Remove build artifacts and caches
 	rm -rf build/ dist/ *.egg-info src/*.egg-info docs/build

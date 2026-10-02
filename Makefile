@@ -1,5 +1,8 @@
 .DEFAULT_GOAL := help
 
+# Used mainly to tell `ty` what version of python to use for type checking.
+CI_PYTHON_VERSION := 3.9
+
 .PHONY: help
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -19,7 +22,7 @@ lint: ## Run lint check
 
 .PHONY: type
 type: ## Run type check
-	uv run --locked ty check src
+	uv run --locked ty check --python-version $(CI_PYTHON_VERSION) src
 
 .PHONY: format
 format: ## Format code

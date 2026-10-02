@@ -2,14 +2,15 @@ import json
 import logging
 import urllib.error
 
+import httpx
+
 from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
 
-logger = logging.getLogger("uvicorn.error")
-
+logger = logging.getLogger(__name__)
 
 class GooseProxyError(Exception):
     """Base exception for all goose-proxy errors."""
@@ -18,6 +19,9 @@ class GooseProxyError(Exception):
 class CertificateInitializationError(GooseProxyError):
     """Raised when backend certificate initialization fails."""
 
+def _invalid_url_handler(_: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, httpx.InvalidURL)
+    return _openai_error_response(400, str(exc), "server_error")
 
 def _openai_error_response(status_code: int, message: str, error_type: str) -> JSONResponse:
     """Build an OpenAI-compatible error response."""
@@ -100,4 +104,5 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(HTTPException, _http_exception_handler)
     app.add_exception_handler(urllib.error.HTTPError, _http_error_handler)
     app.add_exception_handler(urllib.error.URLError, _url_error_handler)
+    app.add_exception_handler(httpx.InvalidURL, _invalid_url_handler)
     app.add_exception_handler(CertificateInitializationError, _cert_error_handler)

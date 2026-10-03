@@ -1,28 +1,21 @@
+"""Routes for the /v1 API prefix."""
+
+import contextlib
 import json
 import logging
-import ssl
-import typing as t
-import urllib.error
-import urllib.request
 
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
+from ssl import SSLCertVerificationError
+
+import httpx
 
 from fastapi import APIRouter
-from fastapi import Depends
 from fastapi import Request
+from fastapi.responses import Response
 from fastapi.responses import StreamingResponse
 
 from goose_proxy.config import get_settings
 from goose_proxy.exceptions import CertificateInitializationError
-from goose_proxy.models.chat import ChatCompletionRequest
-from goose_proxy.models.chat import ModelInfo
-from goose_proxy.models.chat import ModelsResponse
-from goose_proxy.models.responses import parse_stream_event
-from goose_proxy.models.responses import Response
-from goose_proxy.models.responses import StreamEvent
-from goose_proxy.translators import translate_request
-from goose_proxy.translators import translate_response
-from goose_proxy.translators import translate_stream
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -30,157 +23,138 @@ logger = logging.getLogger("uvicorn.error")
 router = APIRouter(prefix="/v1")
 
 
-class BackendClient:
-    def __init__(
-        self,
-        base_url: str,
-        ssl_context: ssl.SSLContext,
-        timeout: int,
-        headers: dict,
-        proxy: str = "",
-    ):
-        self.base_url = base_url.rstrip("/")
-        self.ssl_context = ssl_context
-        self.timeout = timeout
-        self.headers = headers
+def _build_client() -> httpx.AsyncClient:
+    """Build an httpx async client with mTLS configured for the backend.
 
-        if proxy:
-            proxy_handler = urllib.request.ProxyHandler({"https": proxy, "http": proxy})
-            https_handler = urllib.request.HTTPSHandler(context=self.ssl_context)
-            self.opener = urllib.request.build_opener(proxy_handler, https_handler)
-        else:
-            https_handler = urllib.request.HTTPSHandler(context=self.ssl_context)
-            self.opener = urllib.request.build_opener(https_handler)
+    Raises CertificateInitializationError when the RHSM certificates cannot be loaded.
+    """
+    settings = get_settings()
+    backend = settings.backend
 
-    def post(self, path: str, body: dict) -> urllib.request.Request:
-        url = self.base_url + path
-        data = json.dumps(body).encode()
-        req = urllib.request.Request(url, data=data, method="POST")
-        for key, value in self.headers.items():
-            req.add_header(key, value)
+    certs = str(backend.auth.cert_file), str(backend.auth.key_file)
 
-        req.add_header("Content-Type", "application/json")
-
-        return req
-
-    def send(self, req: urllib.request.Request):
-        try:
-            return self.opener.open(req, timeout=self.timeout)
-        except urllib.error.HTTPError:
-            logger.debug(
-                "Request that caused backend error\n\t\tRequest: %s %s\n\t\tRequest headers: %s",
-                req.get_method(),
-                req.full_url,
-                dict(req.headers),
-            )
-            raise
-
-    @classmethod
-    def create(cls) -> "BackendClient":
-        logger.debug("Getting backend client")
-        settings = get_settings()
-        backend = settings.backend
-
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        try:
-            ctx.load_cert_chain(str(backend.auth.cert_file), str(backend.auth.key_file))
-        except (FileNotFoundError, ssl.SSLError) as err:
-            raise CertificateInitializationError() from err
-        ctx.load_default_certs()
-
-        client = cls(
-            base_url=backend.endpoint,
-            ssl_context=ctx,
+    try:
+        client = httpx.AsyncClient(
+            cert=certs,
+            proxy=backend.proxy or None,
             timeout=backend.timeout,
-            proxy=backend.proxy,
-            headers={
-                "Accept": "application/json",
-                "X-LCS-Merge-Server-Tools": "true",
-            },
         )
+    except (FileNotFoundError, SSLCertVerificationError) as ex:
+        raise CertificateInitializationError(
+            "Failed to initialize client with RHSM certificates. Check your subscription before continuing"
+        ) from ex
+    except httpx.InvalidURL as ex:
+        raise httpx.InvalidURL("Failed to initialize client. Either baseurl or proxy are invalid") from ex
 
-        return client
-
-    def create_response(self, **params) -> Response:
-        req = self.post("/responses", body=params)
-        with self.send(req) as resp:
-            data = json.loads(resp.read().decode())
-
-        return Response.model_validate(data)
-
-    def open_stream(self, **params):
-        """Open a streaming connection to the backend.
-
-        Returns the raw response object. Raises urllib.error.HTTPError on
-        error status codes before any data is consumed, allowing callers
-        to handle the error before committing to a StreamingResponse.
-        """
-        req = self.post("/responses", body=params)
-
-        return self.send(req)
-
-    @staticmethod
-    def iter_stream_events(resp: t.IO[bytes]) -> Iterator[StreamEvent]:
-        for raw_line in resp:
-            line = raw_line.decode().strip()
-            if not line or line.startswith("event:"):
-                continue
-
-            if line.startswith("data: "):
-                payload = line[6:]
-                if payload == "[DONE]":
-                    break
-
-                try:
-                    data = json.loads(payload)
-                except json.JSONDecodeError:
-                    logger.warning("Skipping malformed SSE data: %s", payload[:120])
-                    continue
-
-                event = parse_stream_event(data)
-                if event is not None:
-                    yield event
-
-    def stream_response(self, **params) -> Iterator[StreamEvent]:
-        with self.open_stream(**params) as resp:
-            yield from self.iter_stream_events(resp)
+    return client
 
 
-@router.post("/chat/completions", response_model_exclude_none=True)
-async def chat_completions(
-    data: ChatCompletionRequest,
-    client: t.Annotated[BackendClient, Depends(BackendClient.create)],
-):
-    params = translate_request(data)
-    if data.stream:
-        resp = client.open_stream(**params)
+def _sse_error_event(message: str, error_type: str = "server_error") -> bytes:
+    """Format an error as an SSE event the client can parse.
 
-        def generate():
-            try:
-                for line in translate_stream(client.iter_stream_events(resp), data.model):
-                    yield line
-            finally:
-                resp.close()
+    Follows the OpenAI streaming error convention so clients that understand
+    SSE error events can surface a meaningful message instead of treating a
+    truncated stream as an opaque failure.
+    """
+    payload = json.dumps(
+        {
+            "type": "error",
+            "code": error_type,
+            "message": message,
+        }
+    )
+    return f"event: error\ndata: {payload}\n\n".encode()
 
-        return StreamingResponse(generate(), media_type="text/event-stream")
 
-    response = client.create_response(**params)
+async def _stream_bytes(
+    response: httpx.Response,
+    stream_ctx: contextlib.AbstractAsyncContextManager[httpx.Response],
+    client: httpx.AsyncClient,
+) -> AsyncIterator[bytes]:
+    """Yield bytes from a validated streaming response.
 
-    return translate_response(response, data.model)
+    If the stream breaks mid-flight (read timeout, connection reset, etc.),
+    emits an SSE error event so the client receives a parseable signal instead
+    of a silently truncated stream.
+
+    Owns cleanup of both the stream context manager and the HTTP client.
+    """
+    try:
+        async for chunk in response.aiter_bytes():
+            yield chunk
+    except (httpx.RequestError, httpx.HTTPStatusError, httpx.ResponseNotRead) as exc:
+        logger.warning("Mid-stream error from backend: %s", exc)
+        yield _sse_error_event(f"Stream interrupted: {exc}")
+    finally:
+        await stream_ctx.__aexit__(None, None, None)
+        await client.aclose()
+
+
+@router.post("/responses")
+async def responses(request: Request):
+    """Forward a Responses API request to the lightspeed-stack backend.
+
+    The request body is passed through verbatim. The only transformation applied
+    is the injection of the mTLS client certificate for backend authentication.
+    """
+    body = await request.json()
+
+    # We remove the model from the request body to avoid sending it to the backend,
+    # as the backend will automatically pick the model for us.
+    body["model"] = ""
+
+    client = _build_client()
+    settings = get_settings()
+    url = f"{settings.backend.endpoint}/responses"
+
+    if not body.get("stream"):
+        async with client:
+            response = await client.post(url, json=body)
+            response.raise_for_status()
+            return Response(content=response.content, media_type="application/json")
+
+    # Streaming path: eagerly connect and validate the backend response
+    # *before* constructing StreamingResponse. This ensures that pre-stream
+    # errors (4xx/5xx, connection failures) surface as proper JSON error
+    # responses instead of broken 200s with no body.
+    await client.__aenter__()
+    stream_ctx = client.stream("POST", url, json=body)
+
+    try:
+        response = await stream_ctx.__aenter__()
+        # Only read the body on errors — streaming responses don't eagerly
+        # load content, and the exception handler needs access to
+        # exc.response.text / .json() for the error message.  On success
+        # we must leave the body unread so _stream_bytes can iterate it.
+        if response.is_error:
+            await response.aread()
+            response.raise_for_status()
+    except (httpx.HTTPStatusError, httpx.RequestError):
+        try:
+            await stream_ctx.__aexit__(None, None, None)
+        except (httpx.HTTPStatusError, httpx.RequestError):
+            pass
+        await client.aclose()
+        raise
+
+    # Connection is healthy and status is 2xx — safe to commit 200 headers.
+    # _stream_bytes owns cleanup of stream_ctx and client from here on.
+    return StreamingResponse(
+        _stream_bytes(response, stream_ctx, client),
+        media_type="text/event-stream",
+    )
 
 
 @router.get("/models")
-async def list_models(_: Request) -> ModelsResponse:
-    """Return fixed model info instead of querying the backend.
+async def list_models(_: Request) -> dict:
+    """Return a fixed model list.
 
-    Always returns 'RHEL-command-line-assistant' as the available model.
-    This simplifies the proxy by avoiding dynamic model lookups.
+    Always returns 'RHEL-command-line-assistant' to hide the real backend model
+    from the client.
     """
-    return ModelsResponse(
-        data=[
-            ModelInfo(
-                id="RHEL-command-line-assistant",
-                owned_by="command-line-assistant",
-            )
-        ]
-    )
+    return {
+        "object": "list",
+        "data": [
+            {"id": "RHEL-command-line-assistant", "created": 0, "object": "model", "owned_by": "command-line-assistant"}
+        ],
+    }

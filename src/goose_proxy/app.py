@@ -1,3 +1,5 @@
+"""FastAPI application factory."""
+
 import logging
 
 from fastapi import FastAPI
@@ -14,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="goose-proxy",
-    description="A proxy that translates OpenAI Chat Completions API to Responses API",
+    description="A passthrough proxy for the Responses API with mTLS authentication",
     version=goose_proxy.__version__,
     contact={"name": "RHEL Lightspeed Team", "email": "rhel-lightspeed-sst@redhat.com"},
     license_info={

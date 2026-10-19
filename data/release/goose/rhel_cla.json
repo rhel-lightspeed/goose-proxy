@@ -16,7 +16,9 @@
             "supports_cache_control": null
     }
   ],
-    "headers": {},
+    "headers": {
+      "X-LCS-Shield-After-Last-Refusal": true
+    },
     "timeout_seconds": null,
     "supports_streaming": true,
     "requires_auth": true

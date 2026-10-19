@@ -54,10 +54,9 @@ def provider_file(tmp_path):
 
 
 class TestFreshInstall:
-    def test_config_created_with_correct_base_path(self, tmp_path, fake_redhat):
-        home = tmp_path / "home"
+    def test_config_created_with_correct_base_path(self, config_file, fake_redhat):
         run_init(home, fake_redhat)
-        assert "OPENAI_BASE_PATH: v1/responses" in config_file(home).read_text()
+        assert "OPENAI_BASE_PATH: v1/responses" in config_file
 
     def test_custom_provider_created(self, tmp_path, fake_redhat):
         home = tmp_path / "home"

@@ -42,12 +42,15 @@ def run_init(home, redhat_dir, *args, extra_env):
     )
 
 
-def config_file(home):
-    return home / ".config" / "goose" / "config.yaml"
+@pytest.fixture()
+def config_file(tmp_path):
+    config = tmp_path / "home" / ".config" / "goose" / "config.yaml"
+    return config_file.read_text()
 
-
-def provider_file(home):
-    return home / ".config" / "goose" / "custom_providers" / "rhel_cla.json"
+@pytest.fixture()
+def provider_file(tmp_path):
+    provider = tmp_path / "home" / ".config" / "goose" / "custom_providers" / "rhel_cla.json"
+    return provider.read_text()
 
 
 class TestFreshInstall:

@@ -46,6 +46,7 @@ def _build_client() -> httpx.AsyncClient:
             headers={
                 "Accept": "application/json",
                 "X-LCS-Merge-Server-Tools": "true",
+                "X-LCS-Shield-After-Last-Refusal": "true"
             },
         )
     except httpx.InvalidURL as ex:

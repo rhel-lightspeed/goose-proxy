@@ -95,13 +95,7 @@ async def _stream_bytes(
         await client.aclose()
 
 
-@router.post("/responses")
-async def responses(request: Request):
-    """Forward a Responses API request to the lightspeed-stack backend.
-
-    The request body is passed through verbatim. The only transformation applied
-    is the injection of the mTLS client certificate for backend authentication.
-    """
+async def _submit_request(request: Request):
     body = await request.json()
 
     # We remove the model from the request body to avoid sending it to the backend,
@@ -148,6 +142,21 @@ async def responses(request: Request):
         _stream_bytes(response, stream_ctx, client),
         media_type="text/event-stream",
     )
+
+
+@router.post("/responses")
+async def responses(request: Request):
+    """Forward a Responses API request to the lightspeed-stack backend."""
+    return await _submit_request(request)
+
+
+@router.post("/chat/completions")
+async def chat_completions(request: Request):
+    """Alias for /responses to support stale goose configs pointing to the old endpoint.
+
+    Deprecated: this endpoint will be removed once all clients have migrated to /responses.
+    """
+    return await _submit_request(request)
 
 
 @router.get("/models")

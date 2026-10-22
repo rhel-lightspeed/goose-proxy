@@ -56,15 +56,15 @@ class TestFreshInstall:
         assert provider_file.exists()
 
 
-class TestExistingConfigNoFlag:
-    def test_stale_base_path_not_updated(self, tmp_path, config_file, goose_redhat_dir):
+class TestAutoMigration:
+    def test_stale_base_path_auto_updated(self, tmp_path, config_file, goose_redhat_dir):
         home = tmp_path / "home"
         config_file.parent.mkdir(parents=True)
         config_file.write_text((FIXTURES_DIR / "goose_real_config.yml").read_text())
 
         run_init(home, goose_redhat_dir)
 
-        assert "OPENAI_BASE_PATH: v1/chat/completions" in config_file.read_text()
+        assert "OPENAI_BASE_PATH: v1/responses" in config_file.read_text()
 
     def test_custom_setting_preserved(self, tmp_path, config_file, goose_redhat_dir):
         home = tmp_path / "home"
@@ -75,45 +75,11 @@ class TestExistingConfigNoFlag:
 
         assert "MY_CUSTOM_SETTING: keep_this" in config_file.read_text()
 
-
-@pytest.mark.parametrize(
-    "migrate_args,migrate_env",
-    [
-        (("--migrate",), None),
-        ((), {"GOOSE_MIGRATE": "1"}),
-    ],
-    ids=["flag", "env_var"],
-)
-class TestMigrate:
-    def test_stale_base_path_updated(
-        self, tmp_path, config_file, goose_redhat_dir, migrate_args, migrate_env
-    ):
-        home = tmp_path / "home"
-        config_file.parent.mkdir(parents=True)
-        config_file.write_text((FIXTURES_DIR / "goose_real_config.yml").read_text())
-
-        run_init(home, goose_redhat_dir, *migrate_args, extra_env=migrate_env)
-
-        assert "OPENAI_BASE_PATH: v1/responses" in config_file.read_text()
-
-    def test_custom_setting_preserved(
-        self, tmp_path, config_file, goose_redhat_dir, migrate_args, migrate_env
-    ):
-        home = tmp_path / "home"
-        config_file.parent.mkdir(parents=True)
-        config_file.write_text((FIXTURES_DIR / "goose_real_config.yml").read_text())
-
-        run_init(home, goose_redhat_dir, *migrate_args, extra_env=migrate_env)
-
-        assert "MY_CUSTOM_SETTING: keep_this" in config_file.read_text()
-
-    def test_missing_key_appended(
-        self, tmp_path, config_file, goose_redhat_dir, migrate_args, migrate_env
-    ):
+    def test_missing_key_auto_appended(self, tmp_path, config_file, goose_redhat_dir):
         home = tmp_path / "home"
         config_file.parent.mkdir(parents=True)
         config_file.write_text("GOOSE_PROVIDER: rhel_cla\nOPENAI_HOST: http://127.0.0.1:7080\n")
 
-        run_init(home, goose_redhat_dir, *migrate_args, extra_env=migrate_env)
+        run_init(home, goose_redhat_dir)
 
         assert "OPENAI_BASE_PATH: v1/responses" in config_file.read_text()

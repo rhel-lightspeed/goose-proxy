@@ -35,13 +35,19 @@ migrate_config_key() {
     fi
 }
 
-GOOSE_MIGRATE=${GOOSE_MIGRATE:-0}
-
-for arg in "$@"; do
-    case "${arg}" in
-        --migrate) GOOSE_MIGRATE=1 ;;
-    esac
-done
+needs_migration() {
+    local file="$1"
+    for entry in "${GOOSE_REQUIRED_KEYS[@]}"; do
+        local key="${entry%%:*}"
+        local value="${entry#*:}"
+        local current
+        current=$(grep "^${key}:" "${file}" 2>/dev/null)
+        if [[ "${current}" != "${key}: ${value}" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
 
 mkdir -p "${GOOSE_CUSTOM_PROVIDER_DIR}"
 
@@ -55,12 +61,11 @@ fi
 # ~/.config/goose folder.
 if [[ ! -f "${GOOSE_CONFIG_FILE}" ]]; then
     cp -pa "${GOOSE_REDHAT_CONFIG}" "${GOOSE_CONFIG_FILE}"
-elif [[ "${GOOSE_MIGRATE}" == "1" ]]; then
-    # Migrate only the required provider/endpoint keys when explicitly requested.
-    # All other user settings are preserved.
+elif needs_migration "${GOOSE_CONFIG_FILE}"; then
     for entry in "${GOOSE_REQUIRED_KEYS[@]}"; do
         migrate_config_key "${GOOSE_CONFIG_FILE}" "${entry%%:*}" "${entry#*:}"
     done
+    echo "[goose-init] Config updated: migrated provider/endpoint keys to current values." >&2
 fi
 
 unset GOOSE_REDHAT_DIR

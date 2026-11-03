@@ -1,21 +1,18 @@
 extensions:
-  # See installation and configuration documents to use the Linux MCP Server
-  # https://rhel-lightspeed.github.io/linux-mcp-server/install/
-  # https://rhel-lightspeed.github.io/linux-mcp-server/clients/#goose
-  #
-  # linux-tools:
-  #   enabled: true
-  #   type: stdio
-  #   name: linux-tools
-  #   description: Linux Tools
-  #   cmd: linux-mcp-server
-  #   args: []
-  #   envs:
-  #     LINUX_MCP_ALLOWED_LOG_PATHS: /var/log/messages
-  #   env_keys: []
-  #   timeout: 30
-  #   bundled: null
-  #   available_tools: []
+  mcp-server-for-rhel:
+    enabled: false
+    type: stdio
+    name: mcp-server-for-rhel
+    description: Diagnose and troubleshoot RHEL systems
+    cmd: /usr/bin/linux-mcp-server
+    args: []
+    envs:
+      LINUX_MCP_SERVER_COMMAND_TIMEOUT: "60"
+      LINUX_MCP_HOST_MODE: local-only
+    env_keys: []
+    timeout: 300
+    cwd: null
+    bundled: false
   extensionmanager:
     enabled: true
     type: platform

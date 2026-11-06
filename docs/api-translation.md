@@ -195,9 +195,10 @@ The stream terminates with `data: [DONE]\n\n`.
 
 ## Endpoints
 
-| Proxy Endpoint             | Backend Endpoint | Method |
-|----------------------------|------------------|--------|
-| `/v1/chat/completions`     | `/responses`     | POST   |
-| `/v1/models`               | *(none)*         | GET    |
+| Proxy Endpoint             | Backend Endpoint | Method | Notes                        |
+|----------------------------|------------------|--------|------------------------------|
+| `/v1/responses`            | `/responses`     | POST   | Primary endpoint             |
+| `/v1/chat/completions`     | `/responses`     | POST   | Deprecated alias; will be removed once all clients migrate to `/v1/responses` |
+| `/v1/models`               | *(none)*         | GET    |                              |
 
 The `/v1/models` endpoint returns a hardcoded model list (`rhel-lightspeed/goose`) without querying the backend.

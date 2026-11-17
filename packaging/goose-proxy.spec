@@ -39,18 +39,44 @@ BuildRequires:  systemd-rpm-macros
 
 # Not needed after RHEL 10 as it is native in Python 3.11+
 %if 0%{?rhel} && 0%{?rhel} < 10
+# Only BuildRequires: pyproject macros need it to read pyproject.toml. No
+# runtime Requires: tomli is vendored in _vendor (resolved from pyproject.toml),
+# so also requiring the system copy would ship it twice.
 BuildRequires:  python3-tomli
-Requires:       python3-tomli
 %endif
 
 # Docs dependencies
 # Sphinx is used to build the manpages for the project.
 BuildRequires:  python3-sphinx
 
-# Third-party runtime dependencies used by goose-proxy
+# RSPEED-4014: Third-party runtime dependencies vendored in _vendor, direct and transitive,
+# so CVE trackers and SBOM tools see every bundled library. Keep in sync with
+# `uv pip compile pyproject.toml` (see packaging/vendor-wheels.sh). Exact
+# versions are recorded in the .dist-info directories installed in %%install.
 Provides:       bundled(fastapi)
 Provides:       bundled(uvicorn)
 Provides:       bundled(pydantic)
+Provides:       bundled(pydantic-core)
+Provides:       bundled(starlette)
+Provides:       bundled(h11)
+Provides:       bundled(httpx)
+Provides:       bundled(httpcore)
+Provides:       bundled(anyio)
+Provides:       bundled(idna)
+Provides:       bundled(certifi)
+Provides:       bundled(click)
+Provides:       bundled(annotated-doc)
+Provides:       bundled(annotated-types)
+Provides:       bundled(typing-extensions)
+Provides:       bundled(typing-inspection)
+%if 0%{?rhel} && 0%{?rhel} < 10
+# Python 3.9 (RHEL 9) only
+Provides:       bundled(exceptiongroup)
+Provides:       bundled(tomli)
+%else
+# Python 3.12 (RHEL 10) only
+Provides:       bundled(opentelemetry-api)
+%endif
 
 # SELinux policy build dependencies
 BuildRequires:  selinux-policy-devel
@@ -79,20 +105,20 @@ sed -i '/^addopts = \[/,/^\]/d' pyproject.toml
 # Remove asyncio_mode as pytest-asyncio is not available
 sed -i '/^asyncio_mode = /d' pyproject.toml
 
-# Remove license-files as this is a conflicting property
-sed -i '/^license-files = /d' pyproject.toml
+# RSPEED-4013: Extract the vendored dependency wheels here so they are visible to SBOM
+# generation. They are installed in %%build, as pip is only a BuildRequires
+# and is not available when SBOMer replays %%prep with --nodeps.
+tar xzf %{SOURCE1}
 
-
+%build
 # Install vendored dependency wheels into the _vendor directory so they are
-# included in the wheel built during %%build. The tarball contains wheels for
+# included in the wheel built below. The tarball contains wheels for
 # multiple Python versions (cp39, cp312). A per-version requirements file
 # selects the correct packages and pip picks the compatible wheel.
-tar xzf %{SOURCE1}
 %{python3} -m pip install --no-deps --no-index \
     --find-links vendor_wheels --target src/goose_proxy/_vendor \
     -r vendor_wheels/requirements-%{python3_version_nodots}.txt
 
-%build
 %pyproject_wheel
 
 # Build the manpages
@@ -104,6 +130,13 @@ sphinx-build -b man docs/man docs/build/man
 %install
 %pyproject_install
 %pyproject_save_files %{python_package_src}
+
+# RSPEED-4014: setuptools only packages importable code, so the .dist-info directories pip
+# created for each vendored library are dropped from the wheel. Copy them back:
+# SBOM scanners (e.g. syft) identify Python packages and their versions through
+# these directories.
+%{__cp} -a src/goose_proxy/_vendor/*.dist-info \
+    %{buildroot}%{python3_sitearch}/%{python_package_src}/_vendor/
 
 # Install the manpages for goose-proxy and goose-proxy-config
 %{__install} -D -m 0644 docs/build/man/%{name}-config.5 %{buildroot}%{_mandir}/man5/%{name}-config.5

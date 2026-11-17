@@ -9,7 +9,7 @@ authors = [
     { name = "RHEL Lightspeed Team", email = "rhel-sst-lightspeed@redhat.com" },
 ]
 readme = "README.md"
-license-files = ["LICENSE"]
+license = "Apache-2.0 AND GPL-3.0-or-later"
 dependencies = [
     # tomli is only required below 3.11 as it is native after that version.
     'tomli; python_version<"3.11"',

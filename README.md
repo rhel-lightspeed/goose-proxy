@@ -94,6 +94,10 @@ This produces:
 - **goose-proxy(7)** — project overview and API translation summary
 - **goose-proxy-config(5)** — configuration file reference
 
+## Releasing
+
+See [RELEASE.md](RELEASE.md) for the versioning policy and release process.
+
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE) for details.

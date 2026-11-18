@@ -46,6 +46,11 @@ clean: ## Remove build artifacts and caches
 	find . -type d -name .pytest_cache -exec rm -rf {} +
 	find . -type d -name .ruff_cache -exec rm -rf {} +
 
+.PHONY: bump-version
+bump-version: ## Bump the release version everywhere (usage: make bump-version VERSION=X.Y.Z)
+	@test -n "$(VERSION)" || { echo "VERSION is required, e.g. make bump-version VERSION=1.1.0"; exit 1; }
+	./packaging/bump-version.sh $(VERSION)
+
 .PHONY: clean-vendor
 clean-vendor: ## Remove all vendored packages, keeping only __init__.py
 	find src/goose_proxy/_vendor -mindepth 1 -maxdepth 1 -not -name '__init__.py' -exec rm -rf {} +

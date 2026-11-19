@@ -1,0 +1,35 @@
+extensions:
+  extensionmanager:
+    enabled: true
+    type: platform
+    name: Extension Manager
+    description: Enable extension management tools for discovering, enabling, and disabling extensions
+    display_name: Extension Manager
+    bundled: true
+    available_tools: []
+  developer:
+    enabled: false
+    type: builtin
+    name: developer
+    description: Write and edit files, and execute shell commands
+    display_name: Developer
+    timeout: null
+    bundled: true
+    available_tools: []
+GOOSE_CONTEXT_STRATEGY: prompt
+GOOSE_DISABLE_SESSION_NAMING: true
+GOOSE_MAX_TOKENS: 16000
+GOOSE_MAX_TURNS: 200
+GOOSE_MODE: approve
+GOOSE_MODEL: RHEL-command-line-assistant
+GOOSE_MOIM_MESSAGE_TEXT: "You are a Red Hat Enterprise Linux expert."
+GOOSE_PROVIDER: rhel_cla
+GOOSE_RANDOM_THINKING_MESSAGES: false
+GOOSE_SUBAGENT_MAX_TURNS: 25
+GOOSE_TELEMETRY_ENABLED: false
+OPENAI_BASE_PATH: v1/chat/completions
+OPENAI_HOST: http://127.0.0.1:7080
+OTEL_SDK_DISABLED: true
+SECURITY_PROMPT_ENABLED: true
+SECURITY_PROMPT_THRESHOLD: 0.9
+MY_CUSTOM_SETTING: keep_this

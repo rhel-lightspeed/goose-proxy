@@ -306,6 +306,41 @@ class TestResponses:
         assert "subscription-manager register" in data["error"]["message"]
 
 
+# --- Chat completions endpoint ---
+
+
+class TestChatCompletions:
+    def test_non_streaming_success(self, test_client, mock_client):
+        """Requests to /chat/completions are forwarded to the backend."""
+        response_bytes = b'{"id":"resp_123","object":"response"}'
+        mock_response = MagicMock()
+        mock_response.content = response_bytes
+        mock_response.status_code = 200
+        mock_client.post = AsyncMock(return_value=mock_response)
+
+        resp = test_client.post(
+            "/v1/chat/completions",
+            json={"model": "RHEL-command-line-assistant", "input": "Hello"},
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["id"] == "resp_123"
+
+    def test_non_streaming_clears_model(self, test_client, mock_client):
+        """The client-supplied model is cleared before forwarding."""
+        mock_response = MagicMock()
+        mock_response.content = b'{"id":"resp_456","object":"response"}'
+        mock_response.status_code = 200
+        mock_client.post = AsyncMock(return_value=mock_response)
+
+        test_client.post(
+            "/v1/chat/completions",
+            json={"model": "RHEL-command-line-assistant", "input": "Hello"},
+        )
+
+        assert mock_client.post.call_args.kwargs["json"]["model"] == ""
+
+
 def _make_http_status_error(status_code, body):
     """Build an httpx.HTTPStatusError for test assertions."""
     request = httpx.Request("POST", "https://backend/v1/responses")
